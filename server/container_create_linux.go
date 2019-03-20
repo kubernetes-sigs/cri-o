@@ -824,9 +824,15 @@ func (s *Server) createSandboxContainer(ctx context.Context, containerID string,
 		return nil, err
 	}
 
-	processArgs, err := buildOCIProcessArgs(containerConfig, containerImageConfig)
-	if err != nil {
-		return nil, err
+	processArgs := []string{}
+	if containerImageConfig != nil {
+		processArgs, err = buildOCIProcessArgs(containerConfig, &containerImageConfig.Config)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(processArgs) == 0 {
+		return nil, fmt.Errorf("no command specified")
 	}
 	specgen.SetProcessArgs(processArgs)
 

@@ -218,7 +218,7 @@ func addDevices(sb *sandbox.Sandbox, containerConfig *pb.ContainerConfig, specge
 }
 
 // buildOCIProcessArgs build an OCI compatible process arguments slice.
-func buildOCIProcessArgs(containerKubeConfig *pb.ContainerConfig, imageOCIConfig *v1.Image) ([]string, error) {
+func buildOCIProcessArgs(containerKubeConfig *pb.ContainerConfig, ociConfig *v1.ImageConfig) ([]string, error) {
 	//# Start the nginx container using the default command, but use custom
 	//arguments (arg1 .. argN) for that command.
 	//kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
@@ -230,34 +230,14 @@ func buildOCIProcessArgs(containerKubeConfig *pb.ContainerConfig, imageOCIConfig
 	kubeArgs := containerKubeConfig.Args
 
 	// merge image config and kube config
-	// same as docker does today...
-	if imageOCIConfig != nil {
-		if len(kubeCommands) == 0 {
-			if len(kubeArgs) == 0 {
-				kubeArgs = imageOCIConfig.Config.Cmd
-			}
-			if kubeCommands == nil {
-				kubeCommands = imageOCIConfig.Config.Entrypoint
-			}
+	if ociConfig != nil && len(kubeCommands) == 0 {
+		kubeCommands = ociConfig.Entrypoint
+		if len(kubeArgs) == 0 {
+			kubeArgs = ociConfig.Cmd
 		}
 	}
 
-	if len(kubeCommands) == 0 && len(kubeArgs) == 0 {
-		return nil, fmt.Errorf("no command specified")
-	}
-
-	// create entrypoint and args
-	var entrypoint string
-	var args []string
-	if len(kubeCommands) != 0 {
-		entrypoint = kubeCommands[0]
-		args = append(kubeCommands[1:], kubeArgs...)
-	} else {
-		entrypoint = kubeArgs[0]
-		args = kubeArgs[1:]
-	}
-
-	processArgs := append([]string{entrypoint}, args...)
+	processArgs := append(kubeCommands, kubeArgs...)
 
 	logrus.Debugf("OCI process args %v", processArgs)
 

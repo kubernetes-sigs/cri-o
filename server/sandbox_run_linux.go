@@ -141,15 +141,6 @@ func (s *Server) runPodSandbox(ctx context.Context, req *pb.RunPodSandboxRequest
 
 	// setup defaults for the pod sandbox
 	g.SetRootReadonly(true)
-	if s.config.PauseCommand == "" {
-		if podContainer.Config != nil {
-			g.SetProcessArgs(podContainer.Config.Config.Cmd)
-		} else {
-			g.SetProcessArgs([]string{sandbox.PodInfraCommand})
-		}
-	} else {
-		g.SetProcessArgs([]string{s.config.PauseCommand})
-	}
 
 	// set DNS options
 	if req.GetConfig().GetDnsConfig() != nil {
@@ -260,6 +251,20 @@ func (s *Server) runPodSandbox(ctx context.Context, req *pb.RunPodSandboxRequest
 
 	// Remove the default /dev/shm mount to ensure we overwrite it
 	g.RemoveMount("/dev/shm")
+
+	containerKubeConfig := &pb.ContainerConfig{}
+	if s.config.PauseCommand != "" {
+		containerKubeConfig.Command = []string{s.config.PauseCommand}
+	}
+	processArgs, err := buildOCIProcessArgs(containerKubeConfig, &podContainer.Config.Config)
+	if err != nil {
+		return nil, err
+	}
+	if len(processArgs) == 0 {
+		g.Spec().Process = nil
+	} else {
+		g.SetProcessArgs(processArgs)
+	}
 
 	// create shm mount for the pod containers.
 	var shmPath string

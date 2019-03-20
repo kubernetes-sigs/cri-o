@@ -136,9 +136,6 @@ const (
 	// NsRunDir is the default directory in which running network namespaces
 	// are stored
 	NsRunDir = "/var/run/netns"
-	// PodInfraCommand is the default command when starting a pod infrastructure
-	// container
-	PodInfraCommand = "/pause"
 )
 
 var (
