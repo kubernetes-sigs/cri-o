@@ -213,6 +213,10 @@ func (r *Runtime) newRuntimeImpl(c *Container) (RuntimeImpl, error) {
 		return newRuntimeVM(rh.RuntimePath), nil
 	}
 
+	if rh.RuntimeType == RuntimeTypeFC {
+		return newRuntimeFC(rh.RuntimePath), nil
+	}
+
 	// If the runtime type is different from "vm", then let's fallback
 	// onto the OCI implementation by default.
 	return newRuntimeOCI(r, rh), nil

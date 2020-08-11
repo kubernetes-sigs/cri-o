@@ -5,6 +5,7 @@ module github.com/cri-o/cri-o
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Microsoft/go-winio v0.4.15-0.20200113171025-3fe6c5262873
+	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535 // indirect
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/containerd/containerd v1.3.6
 	github.com/containerd/ttrpc v1.0.1
@@ -24,14 +25,24 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/go-units v0.4.0
+	github.com/firecracker-microvm/firecracker-go-sdk v0.21.0
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/go-openapi/errors v0.19.4 // indirect
+	github.com/go-openapi/loads v0.19.5 // indirect
+	github.com/go-openapi/runtime v0.19.15
+	github.com/go-openapi/spec v0.19.8 // indirect
+	github.com/go-openapi/strfmt v0.19.5
+	github.com/go-openapi/swag v0.19.9 // indirect
+	github.com/go-openapi/validate v0.19.8 // indirect
 	github.com/go-zoo/bone v1.3.0
 	github.com/godbus/dbus/v5 v5.0.3
+	github.com/gofrs/uuid v3.3.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.3
 	github.com/google/renameio v0.1.0
 	github.com/google/uuid v1.1.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.0
+	github.com/hashicorp/go-multierror v1.1.0 // indirect
 	github.com/hpcloud/tail v1.0.0
 	github.com/json-iterator/go v1.1.10
 	github.com/onsi/ginkgo v1.14.0
