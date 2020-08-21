@@ -1,6 +1,7 @@
 package container_test
 
 import (
+	"github.com/cri-o/cri-o/internal/config/apparmor"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	pb "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -169,6 +170,76 @@ var _ = t.Describe("Container", func() {
 			labels, err := sut.SelinuxLabel("a_u:a_t:a_r")
 			Expect(len(labels)).To(Equal(3))
 			Expect(err).To(BeNil())
+		})
+	})
+
+	t.Describe("ApplyAppArmor", func() {
+		appArmorConfig := apparmor.New()
+
+		It("should succeed with empty profile name", func() {
+			// Given
+			Expect(sut.InitSpecGen()).To(BeNil())
+
+			// When
+			err := sut.ApplyAppArmor(appArmorConfig)
+
+			// Then
+			Expect(err).To(BeNil())
+			if appArmorConfig.IsEnabled() {
+				Expect(sut.SpecGen().Config.Process.ApparmorProfile).
+					To(Equal(apparmor.DefaultProfile))
+			} else {
+				Expect(sut.SpecGen().Config.Process.ApparmorProfile).
+					To(BeEmpty())
+			}
+		})
+
+		It("should succeed with provileged container", func() {
+			// Given
+			Expect(sut.InitSpecGen()).To(BeNil())
+			Expect(sut.SetPrivileged()).To(BeNil())
+
+			// When
+			err := sut.ApplyAppArmor(apparmor.New())
+
+			// Then
+			Expect(err).To(BeNil())
+			if appArmorConfig.IsEnabled() {
+				Expect(sut.SpecGen().Config.Process.ApparmorProfile).
+					To(Equal(apparmor.DefaultProfile))
+			} else {
+				Expect(sut.SpecGen().Config.Process.ApparmorProfile).
+					To(BeEmpty())
+			}
+		})
+
+		It("should succeed with custom profile name", func() {
+			// Given
+			const profileName = "my-profile"
+			Expect(sut.InitSpecGen()).To(BeNil())
+			sut.Config().Linux.SecurityContext.ApparmorProfile = profileName
+
+			// When
+			err := sut.ApplyAppArmor(appArmorConfig)
+
+			// Then
+			Expect(err).To(BeNil())
+			if appArmorConfig.IsEnabled() {
+				Expect(sut.SpecGen().Config.Process.ApparmorProfile).
+					To(Equal(profileName))
+			} else {
+				Expect(sut.SpecGen().Config.Process.ApparmorProfile).
+					To(BeEmpty())
+			}
+		})
+
+		It("should fail without initialized spec", func() {
+			// Given
+			// When
+			err := sut.ApplyAppArmor(apparmor.New())
+
+			// Then
+			Expect(err).NotTo(BeNil())
 		})
 	})
 })

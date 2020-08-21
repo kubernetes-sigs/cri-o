@@ -7,7 +7,10 @@ import (
 	"strings"
 
 	"github.com/containers/storage/pkg/stringid"
+	"github.com/cri-o/cri-o/internal/config/apparmor"
+	"github.com/cri-o/cri-o/internal/log"
 	"github.com/cri-o/cri-o/utils"
+	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -62,6 +65,16 @@ type Container interface {
 	// SelinuxLabel returns the container's SelinuxLabel
 	// it takes the sandbox's label, which it falls back upon
 	SelinuxLabel(string) ([]string, error)
+
+	// InitSpecGen initializes a new config spec generator.
+	InitSpecGen() error
+
+	// SpecGen returns the internal config spec generator.
+	SpecGen() *generate.Generator
+
+	// ApplyAppArmor takes the AppArmor config and applies it to the internal
+	// config spec generator.
+	ApplyAppArmor(*apparmor.Config) error
 }
 
 // container is the hidden default type behind the Container interface
@@ -72,6 +85,7 @@ type container struct {
 	id         string
 	name       string
 	privileged bool
+	specGen    *generate.Generator
 }
 
 // New creates a new, empty Sandbox instance
@@ -290,4 +304,44 @@ func (c *container) SelinuxLabel(sboxLabel string) ([]string, error) {
 		ret = append(ret, v)
 	}
 	return ret, nil
+}
+
+// InitSpecGen initializes a new config spec generator.
+func (c *container) InitSpecGen() error {
+	specGen, err := generate.New("linux")
+	if err != nil {
+		return errors.Wrap(err, "creating new linux spec")
+	}
+	c.specGen = &specGen
+	return nil
+}
+
+// SpecGen returns the internal config spec generator.
+func (c *container) SpecGen() *generate.Generator {
+	return c.specGen
+}
+
+// ApplyAppArmor takes the AppArmor config and applies it to the internal
+// config spec generator.
+func (c *container) ApplyAppArmor(appArmorConfig *apparmor.Config) error {
+	if c.specGen == nil {
+		return errors.New("config spec generator of container is not set")
+	}
+	if appArmorConfig.IsEnabled() && !c.Privileged() {
+		profile, err := appArmorConfig.Apply(
+			c.config.GetLinux().GetSecurityContext().GetApparmorProfile(),
+		)
+		if err != nil {
+			return errors.Wrapf(
+				err, "applying apparmor profile to container %s", c.ID(),
+			)
+		}
+
+		log.Debugf(c.ctx,
+			"Applied AppArmor profile %s to container %s", profile, c.ID(),
+		)
+		c.SpecGen().SetProcessApparmorProfile(profile)
+	}
+
+	return nil
 }

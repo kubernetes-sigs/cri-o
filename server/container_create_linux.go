@@ -214,11 +214,8 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 		return nil, err
 	}
 
-	// creates a spec Generator with the default spec.
-	specgen, err := generate.New("linux")
-	if err != nil {
-		return nil, err
-	}
+	// retrieve the spec generator from the container
+	specgen := ctr.SpecGen()
 	specgen.HostSpecific = true
 	specgen.ClearProcessRlimits()
 
@@ -340,7 +337,7 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 		}
 	}()
 
-	containerVolumes, ociMounts, err := addOCIBindMounts(ctx, mountLabel, containerConfig, &specgen, s.config.RuntimeConfig.BindMountPrefix)
+	containerVolumes, ociMounts, err := addOCIBindMounts(ctx, mountLabel, containerConfig, specgen, s.config.RuntimeConfig.BindMountPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +365,7 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 		return nil, err
 	}
 
-	if err := addDevices(ctx, sb, containerConfig, privilegedWithoutHostDevices, &specgen); err != nil {
+	if err := addDevices(ctx, sb, containerConfig, privilegedWithoutHostDevices, specgen); err != nil {
 		return nil, err
 	}
 
@@ -387,16 +384,8 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 	}
 
 	// set this container's apparmor profile if it is set by sandbox
-	if s.Config().AppArmor().IsEnabled() && !ctr.Privileged() {
-		profile, err := s.Config().AppArmor().Apply(
-			containerConfig.GetLinux().GetSecurityContext().GetApparmorProfile(),
-		)
-		if err != nil {
-			return nil, errors.Wrapf(err, "applying apparmor profile to container %s", containerID)
-		}
-
-		log.Debugf(ctx, "Applied AppArmor profile %s to container %s", profile, containerID)
-		specgen.SetProcessApparmorProfile(profile)
+	if err := ctr.ApplyAppArmor(s.Config().AppArmor()); err != nil {
+		return nil, errors.Wrap(err, "apply apparmor profile")
 	}
 
 	logPath, err := ctr.LogPath(sb.LogDir())
@@ -467,7 +456,7 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 			// Clear default capabilities from spec
 			specgen.ClearProcessCapabilities()
 			capabilities.AddCapabilities = append(capabilities.AddCapabilities, s.config.DefaultCapabilities...)
-			err = setupCapabilities(&specgen, capabilities)
+			err = setupCapabilities(specgen, capabilities)
 			if err != nil {
 				return nil, err
 			}
@@ -666,7 +655,7 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 	}
 
 	if ctr.Privileged() {
-		setOCIBindMountsPrivileged(&specgen)
+		setOCIBindMountsPrivileged(specgen)
 	}
 
 	// Set hostname and add env for hostname
@@ -708,7 +697,7 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 
 	spp := containerConfig.GetLinux().GetSecurityContext().GetSeccompProfilePath()
 	if !ctr.Privileged() {
-		if err := s.setupSeccomp(ctx, &specgen, spp); err != nil {
+		if err := s.setupSeccomp(ctx, specgen, spp); err != nil {
 			return nil, err
 		}
 	}
@@ -746,13 +735,13 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 
 	// Setup user and groups
 	if linux != nil {
-		if err := setupContainerUser(ctx, &specgen, mountPoint, mountLabel, containerInfo.RunDir, linux.GetSecurityContext(), containerImageConfig); err != nil {
+		if err := setupContainerUser(ctx, specgen, mountPoint, mountLabel, containerInfo.RunDir, linux.GetSecurityContext(), containerImageConfig); err != nil {
 			return nil, err
 		}
 	}
 
 	// Add image volumes
-	volumeMounts, err := addImageVolumes(ctx, mountPoint, s, &containerInfo, mountLabel, &specgen)
+	volumeMounts, err := addImageVolumes(ctx, mountPoint, s, &containerInfo, mountLabel, specgen)
 	if err != nil {
 		return nil, err
 	}
@@ -848,7 +837,7 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 	}
 
 	if os.Getenv(rootlessEnvName) != "" {
-		makeOCIConfigurationRootless(&specgen)
+		makeOCIConfigurationRootless(specgen)
 	}
 
 	saveOptions := generate.ExportOptions{}
@@ -1092,7 +1081,7 @@ func mountExists(specMounts []rspec.Mount, dest string) bool {
 
 // systemd expects to have /run, /run/lock and /tmp on tmpfs
 // It also expects to be able to write to /sys/fs/cgroup/systemd and /var/log/journal
-func setupSystemd(mounts []rspec.Mount, g generate.Generator) {
+func setupSystemd(mounts []rspec.Mount, g *generate.Generator) {
 	options := []string{"rw", "rprivate", "noexec", "nosuid", "nodev"}
 	for _, dest := range []string{"/run", "/run/lock"} {
 		if mountExists(mounts, dest) {

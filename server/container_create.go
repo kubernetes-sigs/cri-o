@@ -445,7 +445,7 @@ func hostNetwork(containerConfig *pb.ContainerConfig) bool {
 }
 
 // addSecretsBindMounts mounts user defined secrets to the container
-func addSecretsBindMounts(ctx context.Context, mountLabel, ctrRunDir string, defaultMounts []string, specgen generate.Generator) ([]rspec.Mount, error) {
+func addSecretsBindMounts(ctx context.Context, mountLabel, ctrRunDir string, defaultMounts []string, specgen *generate.Generator) ([]rspec.Mount, error) {
 	containerMounts := specgen.Config.Mounts
 	mounts, err := secretMounts(ctx, defaultMounts, mountLabel, ctrRunDir, containerMounts)
 	if err != nil {
@@ -483,6 +483,9 @@ func (s *Server) CreateContainer(ctx context.Context, req *pb.CreateContainerReq
 	}
 
 	ctr := container.New(ctx)
+	if err := ctr.InitSpecGen(); err != nil {
+		return nil, errors.Wrap(err, "initialize container OCI config spec gen")
+	}
 	if err := ctr.SetConfig(req.GetConfig(), req.GetSandboxConfig()); err != nil {
 		return nil, errors.Wrap(err, "setting container config")
 	}

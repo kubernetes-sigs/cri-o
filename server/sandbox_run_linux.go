@@ -428,7 +428,7 @@ func (s *Server) runPodSandbox(ctx context.Context, req *pb.RunPodSandboxRequest
 	g.SetLinuxResourcesCPUShares(PodInfraCPUshares)
 
 	// set up namespaces
-	cleanupFuncs, err := s.configureGeneratorForSandboxNamespaces(hostNetwork, hostIPC, hostPID, sb, g)
+	cleanupFuncs, err := s.configureGeneratorForSandboxNamespaces(hostNetwork, hostIPC, hostPID, sb, &g)
 	// We want to cleanup after ourselves if we are managing any namespaces and fail in this function.
 	defer func() {
 		if retErr != nil {
@@ -734,7 +734,7 @@ func (s *Server) configureGeneratorForSysctls(ctx context.Context, g generate.Ge
 // as well as whether CRI-O should be managing the namespace lifecycle.
 // it returns a slice of cleanup funcs, all of which are the respective NamespaceRemove() for the sandbox.
 // The caller should defer the cleanup funcs if there is an error, to make sure each namespace we are managing is properly cleaned up.
-func (s *Server) configureGeneratorForSandboxNamespaces(hostNetwork, hostIPC, hostPID bool, sb *libsandbox.Sandbox, g generate.Generator) (cleanupFuncs []func() error, retErr error) {
+func (s *Server) configureGeneratorForSandboxNamespaces(hostNetwork, hostIPC, hostPID bool, sb *libsandbox.Sandbox, g *generate.Generator) (cleanupFuncs []func() error, retErr error) {
 	managedNamespaces := make([]libsandbox.NSType, 0, 3)
 	if hostNetwork {
 		if err := g.RemoveLinuxNamespace(string(spec.NetworkNamespace)); err != nil {
@@ -781,7 +781,7 @@ func (s *Server) configureGeneratorForSandboxNamespaces(hostNetwork, hostIPC, ho
 
 // configureGeneratorGivenNamespacePaths takes a map of nsType -> nsPath. It configures the generator
 // to add or replace the defaults to these paths
-func configureGeneratorGivenNamespacePaths(managedNamespaces []*libsandbox.ManagedNamespace, g generate.Generator) error {
+func configureGeneratorGivenNamespacePaths(managedNamespaces []*libsandbox.ManagedNamespace, g *generate.Generator) error {
 	typeToSpec := map[libsandbox.NSType]spec.LinuxNamespaceType{
 		libsandbox.IPCNS:  spec.IPCNamespace,
 		libsandbox.NETNS:  spec.NetworkNamespace,
