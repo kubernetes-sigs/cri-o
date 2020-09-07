@@ -2,7 +2,9 @@ package sandbox
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/cri-o/cri-o/internal/oci"
@@ -22,6 +24,8 @@ const (
 	PIDNS         NSType = "pid"
 	numNamespaces        = 4
 )
+
+var ErrNamespaceNotManaged = errors.New("sandbox namespace not managed")
 
 // NamespaceIface provides a generic namespace interface
 type NamespaceIface interface {
@@ -73,7 +77,7 @@ func (s *Sandbox) CreateManagedNamespaces(managedNamespaces []NSType, idMappings
 	return s.CreateNamespacesWithFunc(managedNamespaces, idMappings, cfg, pinNamespaces)
 }
 
-// CreateManagedNamespacesWithFunc is mainly added for testing purposes. There's no point in actually calling the pinns binary
+// CreateNamespacesWithFunc is mainly added for testing purposes. There's no point in actually calling the pinns binary
 // in unit tests, so this function allows the actual pin func to be abstracted out. Every other caller should use CreateManagedNamespaces
 func (s *Sandbox) CreateNamespacesWithFunc(managedNamespaces []NSType, idMappings *idtools.IDMappings, cfg *config.Config, pinFunc func([]NSType, *config.Config, *idtools.IDMappings) ([]NamespaceIface, error)) (mns []*ManagedNamespace, retErr error) {
 	typesAndPaths := make([]*ManagedNamespace, 0, 4)
@@ -189,6 +193,11 @@ func (s *Sandbox) RemoveManagedNamespaces() error {
 			errs = append(errs, err)
 		}
 	}
+	if s.pidns != nil {
+		if err := s.pidns.Remove(); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	if s.userns != nil {
 		if err := s.userns.Remove(); err != nil {
 			errs = append(errs, err)
@@ -279,11 +288,103 @@ func (s *Sandbox) UserNsJoin(nspath string) error {
 }
 
 // PidNs specific functions
+// CreateManagedPidNamespace creates a managed pid namespace
+// it is separate from the other namespaces because pid namespaces need special handling
+// We cannot tell the runtime: "here is your pid namespace!", because it gets created
+// when the container is created and it would would be a bother having conmon (the parent of the container process)
+// unshare and then do the bind mount
+// instead, we mount the sandbox's pid namespace after the infra container is created
+// and from then on refer to it for each container create
+// thus, this should be called after the infra container has been created in the runtime
+func (s *Sandbox) CreateManagedPidNamespace(cfg *config.Config) error {
+	return s.CreateManagedPidNamespaceWithFunc(cfg, pinPidNamespace)
+}
+
+func (s *Sandbox) CreateManagedPidNamespaceWithFunc(cfg *config.Config, pinFunc func(*config.Config, string) (NamespaceIface, error)) (retErr error) {
+	if cfg == nil {
+		return errors.New("cannot create a managed pid namespace with a nil config")
+	}
+
+	podPidnsProc := s.nsPath(nil, PIDNS)
+	// pid must have stopped or be incorrect, report error
+	if podPidnsProc == "" {
+		return errors.Errorf("proc entry for sandbox %s is gone; pid not created or stopped", s.id)
+	}
+
+	// since this is the first time the sandbox's pidns
+	// has been requested, we need to bind mount it to a new spot
+	// this will allow us to pay less attention to the infra pid for future calls
+	pidnsIface, err := pinFunc(cfg, podPidnsProc)
+	if err != nil {
+		return err
+	}
+
+	// if we fail the below write, we need to clean up the mount we created
+	defer func() {
+		if retErr != nil {
+			if err := pidnsIface.Remove(); err != nil {
+				logrus.Errorf("failed to clean up pidns after we failed to create it: %v", err)
+			}
+		}
+	}()
+
+	if err := s.writePidNsLocation(pidnsIface.Path()); err != nil {
+		return errors.Wrapf(err, "failed to write persistent location of pid")
+	}
+	s.pidns = pidnsIface
+
+	return nil
+}
 
 // PidNsPath returns the path to the pid namespace of the sandbox.
-// If the sandbox uses the host namespace, the empty string is returned.
+// If the sandbox uses the host namespace, the empty string is returned
+// We need the cri-o config to make sure we get the namespace
+// mounted in the correct spot.
 func (s *Sandbox) PidNsPath() string {
-	return s.nsPath(nil, PIDNS)
+	return s.nsPath(s.pidns, PIDNS)
+}
+
+// Attempts to join the pid namespace, whose location is saved in
+// the infra container's run dir.
+// if the location cannot be found (cri-o was restarted from not managing namespaces
+// to managing namespaces), an error ErrNamespaceNotManaged is returned
+func (s *Sandbox) PidNsJoin() error {
+	path, err := s.pidNsLocation()
+	if err != nil {
+		return err
+	}
+	ns, err := nsJoin(path, PIDNS, s.pidns)
+	if err != nil {
+		return err
+	}
+	s.pidns = ns
+	return err
+}
+
+func (s *Sandbox) writePidNsLocation(path string) error {
+	if err := ioutil.WriteFile(s.pidNsLocationFile(), []byte(path), 0o644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Sandbox) pidNsLocation() (string, error) {
+	contents, err := ioutil.ReadFile(s.pidNsLocationFile())
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", ErrNamespaceNotManaged
+		}
+		return "", err
+	}
+	return string(contents), nil
+}
+
+func (s *Sandbox) pidNsLocationFile() string {
+	infra := s.InfraContainer()
+	if infra == nil {
+		return ""
+	}
+	return filepath.Join(infra.Dir(), "pid-location")
 }
 
 // nsJoin checks if the current iface is nil, and if so gets the namespace at nsPath

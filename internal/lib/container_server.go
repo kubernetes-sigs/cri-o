@@ -211,35 +211,6 @@ func (c *ContainerServer) LoadSandbox(id string) (retErr error) {
 	sb.SetSeccompProfilePath(spp)
 	sb.SetNamespaceOptions(&nsOpts)
 
-	// We add an NS only if we can load a permanent one.
-	// Otherwise, the sandbox will live in the host namespace.
-	if c.config.ManageNSLifecycle {
-		netNsPath, err := configNsPath(&m, rspec.NetworkNamespace)
-		if err == nil {
-			if nsErr := sb.NetNsJoin(netNsPath); nsErr != nil {
-				return nsErr
-			}
-		}
-		ipcNsPath, err := configNsPath(&m, rspec.IPCNamespace)
-		if err == nil {
-			if nsErr := sb.IpcNsJoin(ipcNsPath); nsErr != nil {
-				return nsErr
-			}
-		}
-		utsNsPath, err := configNsPath(&m, rspec.UTSNamespace)
-		if err == nil {
-			if nsErr := sb.UtsNsJoin(utsNsPath); nsErr != nil {
-				return nsErr
-			}
-		}
-		userNsPath, err := configNsPath(&m, rspec.UserNamespace)
-		if err == nil {
-			if nsErr := sb.UserNsJoin(userNsPath); nsErr != nil {
-				return nsErr
-			}
-		}
-	}
-
 	if err := c.AddSandbox(sb); err != nil {
 		return err
 	}
@@ -276,6 +247,44 @@ func (c *ContainerServer) LoadSandbox(id string) (retErr error) {
 	if err != nil {
 		return err
 	}
+
+	if err := sb.SetInfraContainer(scontainer); err != nil {
+		return errors.Wrapf(err, "set infra container")
+	}
+
+	if err := c.ContainerStateFromDisk(scontainer); err != nil {
+		return errors.Wrapf(err, "error reading sandbox state from disk %q", scontainer.ID())
+	}
+
+	// We add an NS only if we can load a permanent one.
+	// Otherwise, the sandbox will live in the host namespace.
+	if c.config.ManageNSLifecycle {
+		namespacesToJoin := []struct {
+			rspecNS  rspec.LinuxNamespaceType
+			joinFunc func(string) error
+		}{
+			{rspecNS: rspec.NetworkNamespace, joinFunc: sb.NetNsJoin},
+			{rspecNS: rspec.IPCNamespace, joinFunc: sb.IpcNsJoin},
+			{rspecNS: rspec.UTSNamespace, joinFunc: sb.UtsNsJoin},
+			{rspecNS: rspec.UserNamespace, joinFunc: sb.UserNsJoin},
+		}
+		for _, namespaceToJoin := range namespacesToJoin {
+			path, err := configNsPath(&m, namespaceToJoin.rspecNS)
+			if err == nil {
+				if nsErr := namespaceToJoin.joinFunc(path); err != nil {
+					return nsErr
+				}
+			}
+		}
+		// PidNs needs to be handled differently
+		if err := sb.PidNsJoin(); err != nil {
+			// if the namespace wasn't managed, then we silently skip
+			if !errors.Is(err, sandbox.ErrNamespaceNotManaged) {
+				return err
+			}
+		}
+	}
+
 	scontainer.SetSpec(&m)
 	scontainer.SetMountPoint(m.Annotations[annotations.MountPoint])
 
@@ -289,10 +298,6 @@ func (c *ContainerServer) LoadSandbox(id string) (retErr error) {
 		}
 	}
 
-	if err := c.ContainerStateFromDisk(scontainer); err != nil {
-		return fmt.Errorf("error reading sandbox state from disk %q: %v", scontainer.ID(), err)
-	}
-
 	// We write back the state because it is possible that crio did not have a chance to
 	// read the exit file and persist exit code into the state on reboot.
 	if err := c.ContainerStateToDisk(scontainer); err != nil {
@@ -301,9 +306,6 @@ func (c *ContainerServer) LoadSandbox(id string) (retErr error) {
 
 	sb.SetCreated()
 	if err := label.ReserveLabel(processLabel); err != nil {
-		return err
-	}
-	if err := sb.SetInfraContainer(scontainer); err != nil {
 		return err
 	}
 

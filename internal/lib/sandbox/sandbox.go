@@ -40,6 +40,7 @@ type Sandbox struct {
 	mountLabel     string
 	netns          NamespaceIface
 	ipcns          NamespaceIface
+	pidns          NamespaceIface
 	utsns          NamespaceIface
 	userns         NamespaceIface
 	shmPath        string
