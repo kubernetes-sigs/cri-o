@@ -22,6 +22,7 @@ import (
 	"github.com/cri-o/cri-o/internal/version"
 	libconfig "github.com/cri-o/cri-o/pkg/config"
 	"github.com/cri-o/cri-o/server"
+	"github.com/cri-o/cri-o/server/cri/experimental"
 	v1 "github.com/cri-o/cri-o/server/cri/v1"
 	"github.com/cri-o/cri-o/server/cri/v1alpha2"
 	"github.com/cri-o/cri-o/server/metrics"
@@ -268,6 +269,7 @@ func main() {
 			}
 		}
 
+		experimental.Register(grpcServer, crioServer)
 		v1alpha2.Register(grpcServer, crioServer)
 		v1.Register(grpcServer, crioServer)
 

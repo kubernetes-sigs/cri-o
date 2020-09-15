@@ -29,6 +29,7 @@ h
 --conmon-env
 --container-attach-socket-dir
 --container-exits-dir
+--criu-path
 --ctr-stop-timeout
 --decryption-keys-path
 --default-capabilities
