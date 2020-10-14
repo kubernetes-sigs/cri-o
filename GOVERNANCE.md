@@ -1,6 +1,6 @@
 # CRI-O contributor tiers
 
-* CRI-O only has two tiers of code contributors: maintainers and community members. 
+* CRI-O has three tiers of code contributors: maintainers, emeritus maintainers, and community members.
 * Anyone can (and is encouraged to) be a community member, whose responsibilities are up to the contributor (submitting PRs, reviewing PRs).
 * Maintainers are the set of people that have final say over the direction of the project.
 
@@ -37,7 +37,19 @@
 
 ## When does a maintainer lose maintainer status
 
-If a maintainer is no longer interested or cannot perform the maintainer duties listed above, they should volunteer to be removed from the [OWNERS list](github.com/cri-o/cri-o/tree/master/OWNERS). In extreme cases this can also occur by a vote of the maintainers per the voting process below.
+If a maintainer is no longer interested or cannot perform the maintainer duties listed above, they may volunteer to be removed from the [OWNERS list](github.com/cri-o/cri-o/tree/master/OWNERS).
+
+In extreme cases this can also occur by a vote of the maintainers per the voting process below.
+
+They may also opt to be come an [emeritus maintainer](#emeritus-maintainer)
+
+# Emeritus Maintainer
+
+An emeritus maintainer is a maintainer who used to spend a significant amount of time on the project, but now has refocused their efforts.
+
+The CRI-O community has the emeritus maintainer tier to recognize the impact and input early maintainers have had on the project, while also being realistic about their current committment level.
+
+There is no formal process for becoming an emeritus maintainer: a maintainer simply slows down on their contributions but does not remove themselves from the [OWNERS file](OWNERS.md).
 
 # Feature addition policy
 
