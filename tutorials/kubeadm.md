@@ -1,6 +1,6 @@
 # Running CRI-O with kubeadm
 
-This tutorial assumes you've already installed and setup CRI-O. If you have not, start [here](setup.md).
+This tutorial assumes you've already installed and setup CRI-O. If you have not, start [here](install-distro.md).
 It also assumes you've set up your system to use kubeadm. If you haven't done so, [here is a good tutorial](https://www.mirantis.com/blog/how-install-kubernetes-kubeadm/)
 
 ### Configuring CNI
