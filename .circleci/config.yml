@@ -4,9 +4,9 @@ version: 2.1
 stdenv: &stdenv
   environment:
     GOCACHE: &gocache /tmp/go-build
-    IMAGE: &image quay.io/crio/crio-build-amd64-go1.15:master-1.5.0
-    IMAGELEGACY: &imagelegacy quay.io/crio/crio-build-amd64-go1.14:master-1.5.0
-    IMAGE386: &image386 quay.io/crio/crio-build-386-go1.15:master-1.5.0
+    IMAGE: &image quay.io/crio/crio-build-amd64-go1.15:master-1.6.0
+    IMAGELEGACY: &imagelegacy quay.io/crio/crio-build-amd64-go1.14:master-1.6.0
+    IMAGE386: &image386 quay.io/crio/crio-build-386-go1.15:master-1.6.0
     JOBS: &jobs 4
     WORKDIR: &workdir /go/src/github.com/cri-o/cri-o
     WORKDIR_VM: &workdir_vm /home/circleci/go/src/github.com/cri-o/cri-o
@@ -166,6 +166,7 @@ jobs:
             set -ex
             sudo mkdir -p .cache
             sudo mv .cache /nix
+            make lib
             if [[ -z $(ls -A /nix) ]]; then sudo docker run --rm --privileged -ti -v /:/mnt nixos/nix cp -rfT /nix /mnt/nix; fi
             sudo docker run --rm --privileged -ti -v /nix:/nix -v ${PWD}:${PWD} -w ${PWD} nixos/nix nix --print-build-logs --option cores 8 --option max-jobs 8 build --file nix/
       - run:

@@ -1,0 +1,25 @@
+---
+
+- name: install
+  shell: |
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+        sh -s -- --profile=complete -y
+
+- name: link toolchain
+  file:
+    src: "{{ ansible_user_dir }}/.cargo/bin/{{ item }}"
+    dest: "/usr/bin/{{ item }}"
+    state: link
+  with_items:
+    - cargo
+    - cargo-clippy
+    - cargo-fmt
+    - cargo-miri
+    - clippy-driver
+    - rls
+    - rust-gdb
+    - rust-lldb
+    - rustc
+    - rustdoc
+    - rustfmt
+    - rustup

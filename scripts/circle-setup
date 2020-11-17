@@ -11,6 +11,7 @@ main() {
 
     install_packages
     install_golang
+    install_rust
     install_bats
     install_conmon
     install_critools
@@ -43,7 +44,7 @@ install_golang() {
     sudo rm -rf /usr/local/bin/go
 
     # set GOPATH
-    echo "export GOPATH=/home/circleci/go" >>~/.bashrc
+    echo "export GOPATH=$HOME/go" >>~/.bashrc
 
     curl -fsSL "https://dl.google.com/go/go${VERSIONS["go"]}.linux-amd64.tar.gz" | sudo tar Cxz /usr/local
 
@@ -56,6 +57,7 @@ install_packages() {
     sudo apt install -y \
         apparmor \
         conntrack \
+        curl \
         jq \
         libaio-dev \
         libapparmor-dev \
@@ -73,6 +75,13 @@ install_packages() {
         libsystemd-dev \
         libudev-dev \
         uuid-dev
+}
+
+install_rust() {
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    echo "export PATH=$HOME/.cargo/bin:$PATH" >>~/.bashrc
+    # shellcheck disable=SC1090
+    . "$HOME/.cargo/env"
 }
 
 install_bats() {

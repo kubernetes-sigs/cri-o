@@ -38,7 +38,7 @@ let
     doCheck = false;
     enableParallelBuilding = true;
     outputs = [ "out" ];
-    nativeBuildInputs = [ bash git go-md2man installShellFiles makeWrapper pkg-config which ];
+    nativeBuildInputs = [ bash curl git go-md2man installShellFiles makeWrapper pkg-config which ];
     buildInputs = [ glibc glibc.static gpgme libassuan libgpgerror libseccomp libapparmor libselinux ];
     prePatch = ''
       export CFLAGS='-static'

@@ -18,6 +18,7 @@ import (
 
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/idtools"
+	"github.com/cri-o/cri-o/internal/ffi"
 	"github.com/cri-o/cri-o/internal/lib"
 	"github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/oci"
@@ -425,6 +426,11 @@ func New(
 	// Start the metrics server if configured to be enabled
 	if err := s.startMetricsServer(); err != nil {
 		return nil, err
+	}
+
+	// Setup the interface to the Rust library
+	if err := ffi.Setup(); err != nil {
+		return nil, errors.Wrap(err, "setup Rust library interface")
 	}
 
 	return s, nil

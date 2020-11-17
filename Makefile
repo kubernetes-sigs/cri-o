@@ -107,7 +107,7 @@ BASE_LDFLAGS = ${SHRINKFLAGS} \
 
 GO_LDFLAGS = -ldflags '${BASE_LDFLAGS} ${EXTRA_LDFLAGS}'
 
-TESTIMAGE_VERSION := master-1.5.0
+TESTIMAGE_VERSION := master-1.6.0
 TESTIMAGE_REGISTRY := quay.io/crio
 TESTIMAGE_SCRIPT := scripts/build-test-image -r $(TESTIMAGE_REGISTRY) -v $(TESTIMAGE_VERSION)
 TESTIMAGE_NAME ?= $(shell $(TESTIMAGE_SCRIPT) -d)
@@ -138,7 +138,7 @@ ifeq ("$(wildcard $(GOPKGDIR))","")
 endif
 	touch "$(GOPATH)/.gopathok"
 
-lint: .gopathok ${GOLANGCI_LINT}
+lint: .gopathok ${GOLANGCI_LINT} lib
 	${GOLANGCI_LINT} version
 	${GOLANGCI_LINT} linters
 	${GOLANGCI_LINT} run
@@ -166,10 +166,10 @@ test/copyimg/copyimg: $(GO_FILES) .gopathok
 test/checkseccomp/checkseccomp: $(GO_FILES) .gopathok
 	$(GO_BUILD) $(GCFLAGS) $(GO_LDFLAGS) -tags "$(BUILDTAGS)" -o $@ $(PROJECT)/test/checkseccomp
 
-bin/crio: $(GO_FILES) .gopathok
+bin/crio: $(GO_FILES) .gopathok lib
 	$(GO_BUILD) $(GCFLAGS) $(GO_LDFLAGS) -tags "$(BUILDTAGS)" -o $@ $(PROJECT)/cmd/crio
 
-bin/crio-status: $(GO_FILES) .gopathok
+bin/crio-status: $(GO_FILES) .gopathok lib
 	$(GO_BUILD) $(GCFLAGS) $(GO_LDFLAGS) -tags "$(BUILDTAGS)" -o $@ $(PROJECT)/cmd/crio-status
 
 build-static:
@@ -196,6 +196,12 @@ dependencies: ${GO_MOD_OUTDATED}
 	${GO_RUN} ./scripts/dependencies \
 		--output-path ${BUILD_PATH}/dependencies
 
+.PHONY: lib
+lib: internal/ffi/lib/libcri.a
+
+internal/ffi/lib/libcri.a:
+	@scripts/ensure-rust-lib
+
 clean:
 ifneq ($(GOPATH),)
 	rm -f "$(GOPATH)/.gopathok"
@@ -209,7 +215,7 @@ endif
 	$(MAKE) -C pinns clean
 	rm -f test/copyimg/copyimg
 	rm -f test/checkseccomp/checkseccomp
-	rm -rf ${BUILD_BIN_PATH}
+	rm -rf ${BUILD_PATH}
 
 # the approach here, rather than this target depending on the build targets
 # directly, is such that each target should try to build regardless if it
@@ -302,7 +308,7 @@ vendor:
 	$(GO) mod vendor
 	$(GO) mod verify
 
-testunit: ${GINKGO}
+testunit: ${GINKGO} lib
 	rm -rf ${COVERAGE_PATH} && mkdir -p ${COVERAGE_PATH}
 	rm -rf ${JUNIT_PATH} && mkdir -p ${JUNIT_PATH}
 	${BUILD_BIN_PATH}/ginkgo \

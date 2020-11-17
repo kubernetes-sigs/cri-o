@@ -14,6 +14,9 @@
       vars:
         version: "1.14.4"
 
+    - name: install rust toolchain
+      include: rust.yml
+
     - name: clone build and install bats
       include: "build/bats.yml"
 
@@ -76,6 +79,10 @@
       include: golang.yml
       vars:
         version: "1.15"
+
+    - name: install rust toolchain
+      include: rust.yml
+
     - name: clone build and install cri-o
       include: "build/cri-o.yml"
 

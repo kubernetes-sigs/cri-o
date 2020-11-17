@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+TARGET_DIR=internal/ffi/lib
+rm -rf "${TARGET_DIR:?}/*.{a,h}"
+VERSION=$(cat $TARGET_DIR/VERSION)
+
+if [[ $(go env GOARCH) == amd64 ]]; then
+    echo "Found 64bit system, downloading prebuild static lib"
+    FILE="lib-$VERSION.tar.gz"
+    curl -sf "https://storage.googleapis.com/k8s-conform-cri-o/lib/$FILE" -o- |
+        tar xfz - -C "$TARGET_DIR"
+    exit 0
+fi
+
+export PATH=$HOME/.cargo/bin:$PATH
+
+echo "Building Rust lib from source"
+TEMP_DIR=$(mktemp -u)
+git clone https://github.com/cri-o/cri "$TEMP_DIR"
+
+pushd "$TEMP_DIR"
+git checkout "$VERSION"
+cargo build --release
+popd
+
+FILES=(
+    "$TEMP_DIR/src/ffi/ffi.h"
+    "$TEMP_DIR/target/release/libcri.a"
+)
+
+for FILE in "${FILES[@]}"; do
+    cp "$FILE" "$TARGET_DIR"
+done
+
+rm -rf "$TEMP_DIR"

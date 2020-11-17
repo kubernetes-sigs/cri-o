@@ -83,7 +83,7 @@ parse_args() {
 
 digest() {
     IMAGE=$BASE_IMAGE:$GO
-    buildah rmi "$IMAGE" 2>/dev/null || true
+    buildah rmi "$IMAGE" >/dev/null 2>&1 || true
     buildah manifest inspect docker://"$IMAGE" |
         jq -er "[.manifests[] | select(
                  .platform.architecture == \"$ARCH\" and
@@ -111,6 +111,7 @@ main() {
 
     set -x
     install_packages
+    install_rust
     install_bats
     install_conmon
     install_cri_tools
@@ -146,6 +147,7 @@ install_packages() {
         build-essential \
         clang-format \
         conntrack \
+        curl \
         e2fslibs-dev \
         gawk \
         gettext \
@@ -178,6 +180,16 @@ install_packages() {
         socat
     run apt-get clean
     rm -rf "$MOUNT_DIR"/var/lib/apt/lists/*
+}
+
+install_rust() {
+    HOST=i686-unknown-linux-gnu
+    if [[ "$ARCH" == "$ARCH_AMD64" ]]; then
+        HOST=x86_64-unknown-linux-gnu
+    fi
+    run bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |\
+        sh -s -- -y --default-host $HOST"
+    buildah config -e PATH=/root/.cargo/bin:\$PATH "$WORK_CTR"
 }
 
 install_bats() {
