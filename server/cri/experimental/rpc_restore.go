@@ -28,6 +28,8 @@ func (s *service) RestoreContainer(ctx context.Context, req *RestoreContainerReq
 		return nil, err
 	}
 	return &RestoreContainerResponse{
-		Id: response,
+		Id:                 response.ID,
+		Pod:                response.Pod,
+		RestoredContainers: response.RestoredContainers,
 	}, nil
 }
