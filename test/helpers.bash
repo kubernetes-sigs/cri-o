@@ -250,12 +250,6 @@ function setup_crio() {
     CNI_DEFAULT_NETWORK=${CNI_DEFAULT_NETWORK:-crio}
     CNI_TYPE=${CNI_TYPE:-bridge}
 
-    # Workaround for https://github.com/containers/crun/pull/531.
-    # TODO: remove once crun > 0.15 is released and used here.
-    if $RUNTIME_BINARY --version | grep -q '^crun '; then
-        OVERRIDE_OPTIONS="$OVERRIDE_OPTIONS --selinux=false"
-    fi
-
     # shellcheck disable=SC2086
     "$CRIO_BINARY_PATH" \
         --hooks-dir="$HOOKSDIR" \
