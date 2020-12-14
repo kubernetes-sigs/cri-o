@@ -19,3 +19,9 @@ func (c *NetworkConfig) SetCNIPlugin(plugin ocicni.CNIPlugin) error {
 	c.cniPlugin = plugin
 	return nil
 }
+
+// SetCheckpointRestore offers the possibility to turn on and
+// turn off CheckpointRestore support for testing.
+func (c *RuntimeConfig) SetCheckpointRestore(cr bool) {
+	c.checkpointRestore = cr
+}

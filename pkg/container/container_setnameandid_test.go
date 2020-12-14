@@ -37,6 +37,29 @@ var _ = t.Describe("Container:SetNameAndID", func() {
 		Expect(sut.Name()).To(ContainSubstring(uid))
 	})
 
+	It("should succeed with ID as paramater", func() {
+		// Given
+		const (
+			name      = "name"
+			namespace = "namespace"
+			uid       = "uid"
+		)
+		metadata := &types.PodSandboxMetadata{
+			Name: name, UID: uid, Namespace: namespace,
+		}
+		setupContainerWithMetadata(metadata)
+
+		// When
+		err := sut.SetNameAndID("use-this-ID")
+
+		// Then
+		Expect(err).To(BeNil())
+		Expect(sut.ID()).To(Equal("use-this-ID"))
+		Expect(sut.Name()).To(ContainSubstring(name))
+		Expect(sut.Name()).To(ContainSubstring(namespace))
+		Expect(sut.Name()).To(ContainSubstring(uid))
+	})
+
 	It("should succeed with empty sandbox metadata", func() {
 		// Given
 		metadata := &types.PodSandboxMetadata{}

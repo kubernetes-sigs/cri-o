@@ -166,6 +166,9 @@ test/copyimg/copyimg: $(GO_FILES) .gopathok
 test/checkseccomp/checkseccomp: $(GO_FILES) .gopathok
 	$(GO_BUILD) $(GCFLAGS) $(GO_LDFLAGS) -tags "$(BUILDTAGS)" -o $@ $(PROJECT)/test/checkseccomp
 
+test/checkcriu/checkcriu: $(GO_FILES) .gopathok
+	$(GO_BUILD) $(GCFLAGS) $(GO_LDFLAGS) -tags "$(BUILDTAGS)" -o $@ $(PROJECT)/test/checkcriu
+
 bin/crio: $(GO_FILES) .gopathok
 	$(GO_BUILD) $(GCFLAGS) $(GO_LDFLAGS) -tags "$(BUILDTAGS)" -o $@ $(PROJECT)/cmd/crio
 
@@ -212,6 +215,7 @@ endif
 	$(MAKE) -C pinns clean
 	rm -f test/copyimg/copyimg
 	rm -f test/checkseccomp/checkseccomp
+	rm -f test/checkseccomp/checkcriu
 	rm -rf ${BUILD_BIN_PATH}
 
 # the approach here, rather than this target depending on the build targets
@@ -369,7 +373,7 @@ localintegration: clean binaries test-binaries
 	./test/test_runner.sh ${TESTFLAGS}
 
 binaries: bin/crio bin/crio-status bin/pinns bin/crio-cr
-test-binaries: test/copyimg/copyimg test/checkseccomp/checkseccomp
+test-binaries: test/copyimg/copyimg test/checkseccomp/checkseccomp test/checkcriu/checkcriu
 
 MANPAGES_MD := $(wildcard docs/*.md)
 MANPAGES    := $(MANPAGES_MD:%.md=%)

@@ -22,6 +22,9 @@ CRIO_STATUS_BINARY_PATH=${CRIO_STATUS_BINARY_PATH:-${CRIO_ROOT}/bin/crio-status}
 # Path to the pinns binary
 PINNS_BINARY_PATH=${PINNS_BINARY_PATH:-${CRIO_ROOT}/bin/pinns}
 
+# Path to the pinns binary
+CRIO_CR_BINARY_PATH=${CRIO_CR_BINARY_PATH:-${CRIO_ROOT}/bin/crio-cr}
+
 # Path of the crictl binary.
 CRICTL_PATH=$(command -v crictl || true)
 CRICTL_BINARY=${CRICTL_PATH:-/usr/bin/crictl}
@@ -60,6 +63,8 @@ COPYIMG_BINARY=${COPYIMG_BINARY:-${CRIO_ROOT}/test/copyimg/copyimg}
 ARTIFACTS_PATH=${ARTIFACTS_PATH:-${CRIO_ROOT}/.artifacts}
 # Path of the checkseccomp binary.
 CHECKSECCOMP_BINARY=${CHECKSECCOMP_BINARY:-${CRIO_ROOT}/test/checkseccomp/checkseccomp}
+# Path of the checkcriu binary.
+CHECKCRIU_BINARY=${CHECKCRIU_BINARY:-${CRIO_ROOT}/test/checkcriu/checkcriu}
 # The default log directory where all logs will go unless directly specified by the kubelet
 DEFAULT_LOG_PATH=${DEFAULT_LOG_PATH:-/var/log/crio/pods}
 # Cgroup manager to be used
@@ -188,6 +193,11 @@ function crio() {
 # Run crictl using the binary specified by $CRICTL_BINARY.
 function crictl() {
     "$CRICTL_BINARY" -r "unix://$CRIO_SOCKET" -i "unix://$CRIO_SOCKET" "$@"
+}
+
+# Run crictl using the binary specified by $CRICTL_BINARY.
+function crio-cr() {
+    "$CRIO_CR_BINARY_PATH" -d --connect "$CRIO_SOCKET" "$@"
 }
 
 # Run the runtime binary with the specified RUNTIME_ROOT
@@ -547,4 +557,14 @@ function fail() {
 # tests whether the node is configured to use cgroupv2
 function is_cgroup_v2() {
     test "$(stat -f -c%T /sys/fs/cgroup)" = "cgroup2fs"
+}
+
+function has_criu() {
+    if [ ! -e "$(command -v criu)" ]; then
+        skip "CRIU binary not found"
+    fi
+
+    if ! "$CHECKCRIU_BINARY"; then
+        skip "CRIU too old. At least 3.16 needed."
+    fi
 }
