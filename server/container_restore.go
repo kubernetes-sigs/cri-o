@@ -399,6 +399,13 @@ func (s *Server) importPodCheckpoint(ctx context.Context, req *types.RestoreCont
 		Namespace: podSandboxConfig.Metadata.Namespace,
 		Attempt:   podSandboxConfig.Metadata.Attempt,
 	}
+	if podSandboxConfig.DnsConfig != nil {
+		r.Config.DNSConfig = &types.DNSConfig{
+			Servers:  podSandboxConfig.DnsConfig.Servers,
+			Searches: podSandboxConfig.DnsConfig.Searches,
+			Options:  podSandboxConfig.DnsConfig.Options,
+		}
+	}
 	portMappings := []*types.PortMapping{}
 	for _, x := range podSandboxConfig.PortMappings {
 		portMappings = append(portMappings, &types.PortMapping{

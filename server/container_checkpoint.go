@@ -78,6 +78,14 @@ func (s *Server) CheckpointContainer(ctx context.Context, req *types.CheckpointC
 			portMappings = append(portMappings, pm)
 		}
 		sandboxConfig.PortMappings = portMappings
+		if sb.DNSConfig() != nil {
+			dnsConfig := &pb.DNSConfig{
+				Servers:  sb.DNSConfig().Servers,
+				Searches: sb.DNSConfig().Searches,
+				Options:  sb.DNSConfig().Options,
+			}
+			sandboxConfig.DnsConfig = dnsConfig
+		}
 		if _, err := metadata.WriteJSONFile(sandboxConfig, podCheckpointDirectory, metadata.PodDumpFile); err != nil {
 			return err
 		}

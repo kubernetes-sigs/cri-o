@@ -469,7 +469,9 @@ var _ = t.Describe("ContainerRestore", func() {
 			err := ioutil.WriteFile("pod.options", []byte(`{"Version":1}`), 0o644)
 			Expect(err).To(BeNil())
 			defer func() { os.RemoveAll("pod.options") }()
-			err = ioutil.WriteFile("pod.dump", []byte(`{"metadata":{}}`), 0o644)
+			err = ioutil.WriteFile("pod.dump",
+				[]byte(`{"metadata":{},"port_mappings":[{"protocol":0,"container_port":1,"host_port":2}],"dns_config":{"servers":["1.1.1.1"],"searches":["example.com"]}}`),
+				0o644)
 			Expect(err).To(BeNil())
 			defer func() { os.RemoveAll("pod.dump") }()
 			outFile, err := os.Create("archive.tar")
