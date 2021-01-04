@@ -126,6 +126,24 @@ var _ = t.Describe("Sandbox", func() {
 		})
 	})
 
+	t.Describe("DNSConfig", func() {
+		It("should succeed", func() {
+			// Given
+			Expect(testSandbox.DNSConfig()).To(BeNil())
+			dnsConfig := types.DNSConfig{
+				Servers:  []string{"server1", "server2"},
+				Searches: []string{"searche1", "searches"},
+				Options:  []string{"option1", "option2"},
+			}
+
+			// When
+			testSandbox.SetDNSConfig(&dnsConfig)
+
+			// Then
+			Expect(testSandbox.DNSConfig()).To(Equal(&dnsConfig))
+		})
+	})
+
 	t.Describe("Created", func() {
 		It("should succeed", func() {
 			// Given
