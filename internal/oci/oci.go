@@ -176,6 +176,21 @@ func (r *Runtime) getRuntimeHandler(handler string) (*config.RuntimeHandler, err
 		rh = runtimeHandler
 	}
 
+	// add the runtime config allowed annotations to the runtime handler allowed annotations
+	rh.AllowedAnnotations = append(r.config.AllowedAnnotations, rh.AllowedAnnotations...)
+
+	// remove duplicates from the allowed annotations
+	keys := make(map[string]bool)
+	list := []string{}
+
+	for _, entry := range rh.AllowedAnnotations {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	rh.AllowedAnnotations = list
+
 	return rh, nil
 }
 

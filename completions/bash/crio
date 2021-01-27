@@ -13,6 +13,7 @@ wipe
 help
 h
 --additional-devices
+--allowed-annotations
 --apparmor-profile
 --big-files-temporary-dir
 --bind-mount-prefix

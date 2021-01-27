@@ -12,6 +12,7 @@ crio
 
 ```
 [--additional-devices]=[value]
+[--allowed-annotations]=[value]
 [--apparmor-profile]=[value]
 [--big-files-temporary-dir]=[value]
 [--bind-mount-prefix]=[value]
@@ -115,6 +116,8 @@ crio [GLOBAL OPTIONS] command [COMMAND OPTIONS] [ARGUMENTS...]
 # GLOBAL OPTIONS
 
 **--additional-devices**="": Devices to add to the containers  (default: [])
+
+**--allowed-annotations**="": List of experimental annotations that every runtime handler is allowed to process. If set, overrides runtime handler specific allowed_annotations.
 
 **--apparmor-profile**="": Name of the apparmor profile to be used as the runtime's default. This only takes effect if the user does not specify a profile via the Kubernetes Pod's metadata annotation. (default: crio-default)
 

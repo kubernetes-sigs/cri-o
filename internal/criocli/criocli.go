@@ -293,6 +293,9 @@ func mergeConfig(config *libconfig.Config, ctx *cli.Context) error {
 	if ctx.IsSet("separate-pull-cgroup") {
 		config.SeparatePullCgroup = ctx.String("separate-pull-cgroup")
 	}
+	if ctx.IsSet("allowed-annotations") {
+		config.AllowedAnnotations = StringSliceTrySplit(ctx, "allowed-annotations")
+	}
 
 	if ctx.IsSet("infra-ctr-cpuset") {
 		config.InfraCtrCPUSet = ctx.String("infra-ctr-cpuset")
@@ -428,6 +431,12 @@ func getCrioFlags(defConf *libconfig.Config) []cli.Flag {
 			Usage:   fmt.Sprintf("[EXPERIMENTAL] Pull in new cgroup (default: %q)", defConf.SeparatePullCgroup),
 			EnvVars: []string{"PULL_IN_A_CGROUP"},
 		},
+		&cli.StringSliceFlag{
+			Name:    "allowed-annotations",
+			Usage:   `list of experimental annotations that this runtime handler is allowed to process`,
+			EnvVars: []string{"ALLOWED_ANNOTATIONS"},
+		},
+
 		&cli.StringFlag{
 			Name:      "global-auth-file",
 			Usage:     fmt.Sprintf("Path to a file like /var/lib/kubelet/config.json holding credentials necessary for pulling images from secure registries (default: %q)", defConf.GlobalAuthFile),

@@ -314,6 +314,9 @@ type RuntimeConfig struct {
 	// InfraCtrCPUSet is the CPUs set that will be used to run infra containers
 	InfraCtrCPUSet string `toml:"infra_ctr_cpuset"`
 
+	// list of handler_allowed annotations
+	AllowedAnnotations []string `toml:"allowed_annotations,omitempty"`
+
 	// seccompConfig is the internal seccomp configuration
 	seccompConfig *seccomp.Config
 
@@ -618,6 +621,7 @@ func DefaultConfig() (*Config, error) {
 			cgroupManager:            cgroupManager,
 			deviceConfig:             device.New(),
 			namespaceManager:         nsmgr.New(defaultNamespacesDir, ""),
+			AllowedAnnotations:       []string{},
 		},
 		ImageConfig: ImageConfig{
 			DefaultTransport: "docker://",
