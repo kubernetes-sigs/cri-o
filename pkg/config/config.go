@@ -309,8 +309,8 @@ type RuntimeConfig struct {
 	// error because the container state is still tagged as "running".
 	CtrStopTimeout int64 `toml:"ctr_stop_timeout"`
 
-	// SeparatePullCgroup specifies whether an image pull must be performed in a separate cgroup
-	SeparatePullCgroup string `toml:"separate_pull_cgroup"`
+	// ImagePullCgroup specifies whether an image pull must be performed in a separate cgroup
+	ImagePullCgroup string `toml:"image_pull_cgroup"`
 
 	// InfraCtrCPUSet is the CPUs set that will be used to run infra containers
 	InfraCtrCPUSet string `toml:"infra_ctr_cpuset"`

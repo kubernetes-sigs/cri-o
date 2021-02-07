@@ -163,7 +163,7 @@ irqbalance_config_file = "{{ .IrqBalanceConfigFile }}"
 cgroup_manager = "{{ .CgroupManagerName }}"
 
 # Specify whether the image pull must be performed in a separate cgroup.
-separate_pull_cgroup = "{{ .SeparatePullCgroup }}"
+image_pull_cgroup = "{{ .ImagePullCgroup }}"
 
 # List of default capabilities for containers. If it is empty or commented out,
 # only the capabilities defined in the containers json file by the user/kube

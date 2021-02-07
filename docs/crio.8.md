@@ -75,7 +75,7 @@ crio
 [--seccomp-profile]=[value]
 [--seccomp-use-default-when-empty]=[value]
 [--selinux]
-[--separate-pull-cgroup]=[value]
+[--image-pull-cgroup]=[value]
 [--signature-policy]=[value]
 [--storage-driver|-s]=[value]
 [--storage-opt]=[value]
@@ -284,7 +284,7 @@ crio [GLOBAL OPTIONS] command [COMMAND OPTIONS] [ARGUMENTS...]
 
 **--selinux**: Enable selinux support (default: false)
 
-**--separate-pull-cgroup**="": [EXPERIMENTAL] Pull in new cgroup (default: "")
+**--image-pull-cgroup**="": [EXPERIMENTAL] Pull in new cgroup (default: "")
 
 **--signature-policy**="": Path to signature policy JSON file. (default: "", to use the system-wide default)
 

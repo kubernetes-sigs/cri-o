@@ -290,8 +290,8 @@ func mergeConfig(config *libconfig.Config, ctx *cli.Context) error {
 	if ctx.IsSet("big-files-temporary-dir") {
 		config.BigFilesTemporaryDir = ctx.String("big-files-temporary-dir")
 	}
-	if ctx.IsSet("separate-pull-cgroup") {
-		config.SeparatePullCgroup = ctx.String("separate-pull-cgroup")
+	if ctx.IsSet("image-pull-cgroup") {
+		config.ImagePullCgroup = ctx.String("image-pull-cgroup")
 	}
 
 	if ctx.IsSet("infra-ctr-cpuset") {
@@ -424,8 +424,8 @@ func getCrioFlags(defConf *libconfig.Config) []cli.Flag {
 			TakesFile: true,
 		},
 		&cli.StringFlag{
-			Name:    "separate-pull-cgroup",
-			Usage:   fmt.Sprintf("[EXPERIMENTAL] Pull in new cgroup (default: %q)", defConf.SeparatePullCgroup),
+			Name:    "image-pull-cgroup",
+			Usage:   fmt.Sprintf("[EXPERIMENTAL] Pull in new cgroup (default: %q)", defConf.ImagePullCgroup),
 			EnvVars: []string{"PULL_IN_A_CGROUP"},
 		},
 		&cli.StringFlag{

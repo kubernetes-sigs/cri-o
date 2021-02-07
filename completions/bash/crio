@@ -76,7 +76,7 @@ h
 --seccomp-profile
 --seccomp-use-default-when-empty
 --selinux
---separate-pull-cgroup
+--image-pull-cgroup
 --signature-policy
 --storage-driver
 --storage-opt

@@ -113,7 +113,7 @@ complete -c crio -n '__fish_crio_no_subcommand' -f -l runtimes -r -d 'OCI runtim
 complete -c crio -n '__fish_crio_no_subcommand' -l seccomp-profile -r -d 'Path to the seccomp.json profile to be used as the runtime\'s default. If not specified, then the internal default seccomp profile will be used. (default: "")'
 complete -c crio -n '__fish_crio_no_subcommand' -f -l seccomp-use-default-when-empty -r -d 'Use the default seccomp profile when an empty one is specified (default: false)'
 complete -c crio -n '__fish_crio_no_subcommand' -f -l selinux -d 'Enable selinux support (default: false)'
-complete -c crio -n '__fish_crio_no_subcommand' -f -l separate-pull-cgroup -r -d '[EXPERIMENTAL] Pull in new cgroup (default: "")'
+complete -c crio -n '__fish_crio_no_subcommand' -f -l image-pull-cgroup -r -d '[EXPERIMENTAL] Pull in new cgroup (default: "")'
 complete -c crio -n '__fish_crio_no_subcommand' -l signature-policy -r -d 'Path to signature policy JSON file. (default: "", to use the system-wide default)'
 complete -c crio -n '__fish_crio_no_subcommand' -f -l storage-driver -s s -r -d 'OCI storage driver (default: "")'
 complete -c crio -n '__fish_crio_no_subcommand' -f -l storage-opt -r -d 'OCI storage driver option'

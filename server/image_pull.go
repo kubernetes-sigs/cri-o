@@ -218,14 +218,14 @@ func (s *Server) pullImage(ctx context.Context, pullArgs *pullArguments) (string
 
 		cgroup := ""
 
-		if s.config.SeparatePullCgroup != "" {
+		if s.config.ImagePullCgroup != "" {
 			if !s.config.CgroupManager().IsSystemd() {
-				return "", errors.New("--separate-pull-cgroup is supported only with systemd")
+				return "", errors.New("--image-pull-cgroup is supported only with systemd")
 			}
-			if s.config.SeparatePullCgroup == "pod" {
+			if s.config.ImagePullCgroup == "pod" {
 				cgroup = pullArgs.sandboxCgroup
 			} else {
-				cgroup = s.config.SeparatePullCgroup
+				cgroup = s.config.ImagePullCgroup
 				if !strings.Contains(cgroup, ".slice") {
 					return "", fmt.Errorf("invalid systemd cgroup %q", cgroup)
 				}
@@ -239,7 +239,7 @@ func (s *Server) pullImage(ctx context.Context, pullArgs *pullArguments) (string
 			ProgressInterval: time.Second,
 			Progress:         progress,
 			CgroupPull: storage.CgroupPullConfiguration{
-				UseNewCgroup: s.config.SeparatePullCgroup != "",
+				UseNewCgroup: s.config.ImagePullCgroup != "",
 				ParentCgroup: cgroup,
 			},
 		})
