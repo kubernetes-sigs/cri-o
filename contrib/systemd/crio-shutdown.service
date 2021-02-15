@@ -2,13 +2,19 @@
 Description=Shutdown CRI-O containers before shutting down the system
 Wants=crio.service
 After=crio.service
-Documentation=man:crio(8)
+RequiresMountsFor=/var/lib/containers
 
 [Service]
+EnvironmentFile=-/etc/sysconfig/crio
 Type=oneshot
-ExecStart=/usr/bin/rm -f /var/lib/crio/crio.shutdown
-ExecStop=/usr/bin/env bash -c "/usr/bin/mkdir /var/lib/crio; /usr/bin/touch /var/lib/crio/crio.shutdown"
 RemainAfterExit=yes
+ExecStart=/usr/local/bin/crio \
+          $CRIO_CONFIG_OPTIONS \
+          $CRIO_RUNTIME_OPTIONS \
+          $CRIO_STORAGE_OPTIONS \
+          $CRIO_NETWORK_OPTIONS \
+          $CRIO_METRICS_OPTIONS \
+          shutdown
 
 [Install]
 WantedBy=multi-user.target
