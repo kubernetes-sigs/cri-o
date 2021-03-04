@@ -1,16 +1,16 @@
 [Unit]
-Description=Open Container Initiative Daemon
-Documentation=https://github.com/kubernetes-sigs/cri-o
-After=network-online.target
+Description=Container Runtime Interface for OCI (CRI-O)
+Documentation=https://github.com/cri-o/cri-o
+Wants=network-online.target local-fs.target remote-fs.target time-sync.target
+After=network-online.target local-fs.target remote-fs.target time-sync.target
 
 [Service]
 Type=notify
 EnvironmentFile=-/etc/sysconfig/crio
-EnvironmentFile=-/etc/sysconfig/crio-metrics
-EnvironmentFile=-/etc/sysconfig/crio-network
-EnvironmentFile=-/etc/sysconfig/crio-storage
 Environment=GOTRACEBACK=crash
 ExecStart=/usr/local/bin/crio \
+          $CRIO_CONFIG_OPTIONS \
+          $CRIO_RUNTIME_OPTIONS \
           $CRIO_STORAGE_OPTIONS \
           $CRIO_NETWORK_OPTIONS \
           $CRIO_METRICS_OPTIONS
