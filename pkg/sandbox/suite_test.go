@@ -31,5 +31,7 @@ var _ = AfterSuite(func() {
 })
 
 var _ = BeforeEach(func() {
-	sut = sandbox.New(context.Background())
+	var err error
+	sut, err = sandbox.New(context.Background())
+	Expect(err).To(BeNil())
 })
