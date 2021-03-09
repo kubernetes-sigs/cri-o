@@ -12,6 +12,7 @@ import (
 	"github.com/cri-o/cri-o/internal/log"
 	"github.com/cri-o/cri-o/internal/storage"
 	"github.com/cri-o/cri-o/server/metrics"
+	"github.com/docker/distribution/registry/api/errcode"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	pb "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -20,8 +21,9 @@ import (
 var localRegistryPrefix = libpodImage.DefaultLocalRegistry + "/"
 
 // PullImage pulls a image with authentication config.
-func (s *Server) PullImage(ctx context.Context, req *pb.PullImageRequest) (resp *pb.PullImageResponse, err error) {
+func (s *Server) PullImage(ctx context.Context, req *pb.PullImageRequest) (*pb.PullImageResponse, error) {
 	// TODO: what else do we need here? (Signatures when the story isn't just pulling from docker://)
+	var err error
 	image := ""
 	img := req.GetImage()
 	if img != nil {
@@ -85,10 +87,9 @@ func (s *Server) PullImage(ctx context.Context, req *pb.PullImageRequest) (resp 
 	}
 
 	log.Infof(ctx, "Pulled image: %v", pullOp.imageRef)
-	resp = &pb.PullImageResponse{
+	return &pb.PullImageResponse{
 		ImageRef: pullOp.imageRef,
-	}
-	return resp, nil
+	}, nil
 }
 
 // pullImage performs the actual pull operation of PullImage. Used to separate
@@ -131,6 +132,7 @@ func (s *Server) pullImage(ctx context.Context, pullArgs *pullArguments) (string
 				}
 			}
 			log.Debugf(ctx, "error preparing image %s: %v", img, err)
+			tryIncrementImagePullFailureMetric(ctx, img, err)
 			continue
 		}
 		defer tmpImg.Close()
@@ -146,6 +148,9 @@ func (s *Server) pullImage(ctx context.Context, pullArgs *pullArguments) (string
 			} else if tmpImgConfigDigest.String() == storedImage.ConfigDigest.String() {
 				log.Debugf(ctx, "image %s already in store, skipping pull", img)
 				pulled = img
+
+				// Skipped digests metrics
+				tryRecordSkippedMetric(ctx, img, tmpImgConfigDigest.String())
 
 				// Skipped bytes metrics
 				if storedImage.Size != nil {
@@ -166,6 +171,10 @@ func (s *Server) pullImage(ctx context.Context, pullArgs *pullArguments) (string
 		progress := make(chan types.ProgressProperties)
 		go func() {
 			for p := range progress {
+				if p.Event == types.ProgressEventSkipped {
+					// Skipped digests metrics
+					tryRecordSkippedMetric(ctx, img, p.Artifact.Digest.String())
+				}
 				if p.Artifact.Size > 0 {
 					log.Debugf(ctx, "ImagePull (%v): %s (%s): %v bytes (%.2f%%)",
 						p.Event, img, p.Artifact.Digest, p.Offset,
@@ -208,6 +217,7 @@ func (s *Server) pullImage(ctx context.Context, pullArgs *pullArguments) (string
 		})
 		if err != nil {
 			log.Debugf(ctx, "error pulling image %s: %v", img, err)
+			tryIncrementImagePullFailureMetric(ctx, img, err)
 			continue
 		}
 		pulled = img
@@ -216,6 +226,14 @@ func (s *Server) pullImage(ctx context.Context, pullArgs *pullArguments) (string
 
 	if pulled == "" && err != nil {
 		return "", err
+	}
+
+	// Update metric for successful image pulls
+	nameCounter, err := metrics.CRIOImagePullsSuccesses.GetMetricWithLabelValues(pulled)
+	if err != nil {
+		log.Warnf(ctx, "Unable to write image pull success metric: %v", err)
+	} else {
+		nameCounter.Inc()
 	}
 
 	status, err := s.StorageImageServer().ImageStatus(s.config.SystemContext, pulled)
@@ -230,7 +248,50 @@ func (s *Server) pullImage(ctx context.Context, pullArgs *pullArguments) (string
 	return imageRef, nil
 }
 
-func decodeDockerAuth(s string) (user, password string, err error) {
+func tryIncrementImagePullFailureMetric(ctx context.Context, img string, err error) {
+	// We try to cover some basic use-cases
+	const labelUnknown = "UNKNOWN"
+	label := labelUnknown
+
+	// Docker registry errors
+	for _, desc := range errcode.GetErrorAllDescriptors() {
+		if strings.Contains(err.Error(), desc.Message) {
+			label = desc.Value
+			break
+		}
+	}
+	if label == labelUnknown {
+		if strings.Contains(err.Error(), "connection refused") { // nolint: gocritic
+			label = "CONNECTION_REFUSED"
+		} else if strings.Contains(err.Error(), "connection timed out") {
+			label = "CONNECTION_TIMEOUT"
+		} else if strings.Contains(err.Error(), "404 (Not Found)") {
+			label = "NOT_FOUND"
+		}
+	}
+
+	// Update metric for failed image pulls
+	nameCounter, err := metrics.CRIOImagePullsFailures.GetMetricWithLabelValues(img, label)
+	if err != nil {
+		log.Warnf(ctx, "Unable to write image pull failure metric: %v", err)
+	} else {
+		nameCounter.Inc()
+	}
+}
+
+func tryRecordSkippedMetric(ctx context.Context, name, digest string) {
+	layer := fmt.Sprintf("%s@%s", name, digest)
+	log.Debugf(ctx, "Skipped layer %s", layer)
+
+	counter, err := metrics.CRIOImageLayerReuse.GetMetricWithLabelValues(layer)
+	if err != nil {
+		log.Warnf(ctx, "Unable to write image layer reuse metrics: %v", err)
+	} else {
+		counter.Inc()
+	}
+}
+
+func decodeDockerAuth(s string) (user, password string, _ error) {
 	decoded, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return "", "", err

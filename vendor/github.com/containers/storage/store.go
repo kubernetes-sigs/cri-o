@@ -629,14 +629,14 @@ func GetStore(options StoreOptions) (Store, error) {
 		return nil, errors.Wrap(ErrIncompleteOptions, "no storage runroot specified")
 	}
 
-	if err := os.MkdirAll(options.RunRoot, 0700); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(options.RunRoot, 0700); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(options.GraphRoot, 0700); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(options.GraphRoot, 0700); err != nil {
 		return nil, err
 	}
 	for _, subdir := range []string{"mounts", "tmp", options.GraphDriverName} {
-		if err := os.MkdirAll(filepath.Join(options.GraphRoot, subdir), 0700); err != nil && !os.IsExist(err) {
+		if err := os.MkdirAll(filepath.Join(options.GraphRoot, subdir), 0700); err != nil {
 			return nil, err
 		}
 	}
@@ -3480,6 +3480,9 @@ func ReloadConfigurationFile(configFile string, storeOptions *StoreOptions) {
 	}
 	if config.Storage.Options.MountProgram != "" {
 		storeOptions.GraphDriverOptions = append(storeOptions.GraphDriverOptions, fmt.Sprintf("%s.mount_program=%s", config.Storage.Driver, config.Storage.Options.MountProgram))
+	}
+	if config.Storage.Options.SkipMountHome != "" {
+		storeOptions.GraphDriverOptions = append(storeOptions.GraphDriverOptions, fmt.Sprintf("%s.skip_mount_home=%s", config.Storage.Driver, config.Storage.Options.SkipMountHome))
 	}
 	if config.Storage.Options.IgnoreChownErrors != "" {
 		storeOptions.GraphDriverOptions = append(storeOptions.GraphDriverOptions, fmt.Sprintf("%s.ignore_chown_errors=%s", config.Storage.Driver, config.Storage.Options.IgnoreChownErrors))
