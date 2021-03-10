@@ -8,7 +8,6 @@ import (
 	"github.com/containers/storage"
 	"github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/log"
-	oci "github.com/cri-o/cri-o/internal/oci"
 	"github.com/cri-o/cri-o/internal/runtimehandlerhooks"
 	"github.com/cri-o/cri-o/server/cri/types"
 	"github.com/pkg/errors"
@@ -67,8 +66,7 @@ func (s *Server) stopPodSandbox(ctx context.Context, req *types.StopPodSandboxRe
 			max = len(containers)
 		}
 		for _, ctr := range containers[i:max] {
-			cStatus := ctr.State()
-			if cStatus.Status != oci.ContainerStateStopped {
+			if ctr.IsAlive() == nil {
 				if ctr.ID() == podInfraContainer.ID() {
 					continue
 				}
@@ -98,12 +96,10 @@ func (s *Server) stopPodSandbox(ctx context.Context, req *types.StopPodSandboxRe
 		}
 	}
 
-	if podInfraContainer != nil {
-		podInfraStatus := podInfraContainer.State()
-		if podInfraStatus.Status != oci.ContainerStateStopped {
-			if err := s.StopContainerAndWait(ctx, podInfraContainer, int64(10)); err != nil {
-				return fmt.Errorf("failed to stop infra container for pod sandbox %s: %v", sb.ID(), err)
-			}
+	// only stop the infra container if it exists and is still alive
+	if podInfraContainer != nil && !podInfraContainer.Spoofed() && podInfraContainer.IsAlive() == nil {
+		if err := s.StopContainerAndWait(ctx, podInfraContainer, int64(10)); err != nil {
+			return fmt.Errorf("failed to stop infra container for pod sandbox %s: %v", sb.ID(), err)
 		}
 	}
 
