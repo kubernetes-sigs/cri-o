@@ -39,17 +39,14 @@ func (s *Server) RemovePodSandbox(ctx context.Context, req *types.RemovePodSandb
 
 	// Delete all the containers in the sandbox
 	for _, c := range containers {
-		if !sb.Stopped() {
-			cState := c.State()
-			if cState.Status == oci.ContainerStateCreated || cState.Status == oci.ContainerStateRunning {
-				timeout := int64(10)
-				if err := s.Runtime().StopContainer(ctx, c, timeout); err != nil {
-					// Assume container is already stopped
-					log.Warnf(ctx, "failed to stop container %s: %v", c.Name(), err)
-				}
-				if err := s.Runtime().WaitContainerStateStopped(ctx, c); err != nil {
-					return fmt.Errorf("failed to get container 'stopped' status %s in pod sandbox %s: %v", c.Name(), sb.ID(), err)
-				}
+		if !sb.Stopped() && c.IsAlive() == nil {
+			timeout := int64(10)
+			if err := s.Runtime().StopContainer(ctx, c, timeout); err != nil && !errors.Is(err, oci.ErrContainerStopped) {
+				// Assume container is already stopped
+				log.Warnf(ctx, "failed to stop container %s: %v", c.Name(), err)
+			}
+			if err := s.Runtime().WaitContainerStateStopped(ctx, c); err != nil {
+				return fmt.Errorf("failed to get container 'stopped' status %s in pod sandbox %s: %v", c.Name(), sb.ID(), err)
 			}
 		}
 
