@@ -1,23 +1,23 @@
-package container_test
+package ctrfactory_test
 
 import (
 	"testing"
 
-	"github.com/cri-o/cri-o/pkg/container"
+	"github.com/cri-o/cri-o/internal/ctrfactory"
 	. "github.com/cri-o/cri-o/test/framework"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-// TestContainer runs the specs
-func TestContainer(t *testing.T) {
+// TestContainerFactory runs the specs
+func TestContainerFactory(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunFrameworkSpecs(t, "Container")
+	RunFrameworkSpecs(t, "ContainerFactory")
 }
 
 var (
 	t   *TestFramework
-	sut container.Container
+	sut *ctrfactory.ContainerFactory
 )
 
 var _ = BeforeSuite(func() {
@@ -31,6 +31,6 @@ var _ = AfterSuite(func() {
 
 var _ = BeforeEach(func() {
 	var err error
-	sut, err = container.New()
+	sut, err = ctrfactory.New()
 	Expect(err).To(BeNil())
 })

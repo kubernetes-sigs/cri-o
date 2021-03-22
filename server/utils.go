@@ -4,7 +4,6 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math"
 	"os"
@@ -29,83 +28,8 @@ import (
 )
 
 const (
-	// According to http://man7.org/linux/man-pages/man5/resolv.conf.5.html:
-	// "The search list is currently limited to six domains with a total of 256 characters."
-	maxDNSSearches = 6
-
 	maxLabelSize = 4096
 )
-
-func copyFile(src, dest string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	return err
-}
-
-func removeFile(path string) error {
-	if _, err := os.Stat(path); err == nil {
-		if err := os.Remove(path); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func parseDNSOptions(servers, searches, options []string, path string) error {
-	nServers := len(servers)
-	nSearches := len(searches)
-	nOptions := len(options)
-	if nServers == 0 && nSearches == 0 && nOptions == 0 {
-		return copyFile("/etc/resolv.conf", path)
-	}
-
-	if nSearches > maxDNSSearches {
-		return fmt.Errorf("DNSOption.Searches has more than 6 domains")
-	}
-
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	if nSearches > 0 {
-		data := fmt.Sprintf("search %s\n", strings.Join(searches, " "))
-		_, err = f.Write([]byte(data))
-		if err != nil {
-			return err
-		}
-	}
-
-	if nServers > 0 {
-		data := fmt.Sprintf("nameserver %s\n", strings.Join(servers, "\nnameserver "))
-		_, err = f.Write([]byte(data))
-		if err != nil {
-			return err
-		}
-	}
-
-	if nOptions > 0 {
-		data := fmt.Sprintf("options %s\n", strings.Join(options, " "))
-		_, err = f.Write([]byte(data))
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
 
 func (s *Server) newPodNetwork(sb *sandbox.Sandbox) (ocicni.PodNetwork, error) {
 	var egress, ingress int64 = 0, 0

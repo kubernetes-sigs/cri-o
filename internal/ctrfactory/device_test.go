@@ -1,4 +1,4 @@
-package container_test
+package ctrfactory_test
 
 import (
 	"github.com/cri-o/cri-o/server/cri/types"
@@ -7,7 +7,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/devices"
 )
 
-var _ = t.Describe("Container", func() {
+var _ = t.Describe("ContainerFactory", func() {
 	t.Describe("SpecAddDevice", func() {
 		type testdata struct {
 			testDescription              string

@@ -1,4 +1,4 @@
-package container_test
+package ctrfactory_test
 
 import (
 	"github.com/cri-o/cri-o/server/cri/types"
@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = t.Describe("Container:Privileged", func() {
+var _ = t.Describe("ContainerFactory:Privileged", func() {
 	It("should succeed in setting privileged flag", func() {
 		// Given
 		config := &types.ContainerConfig{

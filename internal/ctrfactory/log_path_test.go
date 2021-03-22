@@ -1,4 +1,4 @@
-package container_test
+package ctrfactory_test
 
 import (
 	"github.com/cri-o/cri-o/server/cri/types"
@@ -12,7 +12,7 @@ const (
 	providedLogDir = "providedLogDir"
 )
 
-var _ = t.Describe("Container:LogPath", func() {
+var _ = t.Describe("ContainerFactory:LogPath", func() {
 	It("should succeed to get log path from container config", func() {
 		// Given
 		config := &types.ContainerConfig{

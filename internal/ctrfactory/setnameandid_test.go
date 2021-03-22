@@ -1,15 +1,15 @@
-package container_test
+package ctrfactory_test
 
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/cri-o/cri-o/pkg/container"
+	"github.com/cri-o/cri-o/internal/ctrfactory"
 	"github.com/cri-o/cri-o/server/cri/types"
 )
 
 // The actual test suite
-var _ = t.Describe("Container:SetNameAndID", func() {
+var _ = t.Describe("ContainerFactory:SetNameAndID", func() {
 	// Setup the SUT
 	BeforeEach(func() {
 	})
@@ -52,7 +52,7 @@ var _ = t.Describe("Container:SetNameAndID", func() {
 	It("should fail with config nil", func() {
 		// Given
 		// When
-		container, err := container.New()
+		container, err := ctrfactory.New()
 		Expect(err).To(BeNil())
 
 		err = container.SetNameAndID()

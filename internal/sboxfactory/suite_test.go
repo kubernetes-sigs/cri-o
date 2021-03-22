@@ -1,23 +1,23 @@
-package sandbox_test
+package sboxfactory_test
 
 import (
 	"testing"
 
-	"github.com/cri-o/cri-o/pkg/sandbox"
+	"github.com/cri-o/cri-o/internal/sboxfactory"
 	. "github.com/cri-o/cri-o/test/framework"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-// TestSandbox runs the specs
-func TestSandbox(t *testing.T) {
+// TestSandboxFactory runs the specs
+func TestSandboxFactory(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunFrameworkSpecs(t, "Sandbox")
+	RunFrameworkSpecs(t, "SandboxFactory")
 }
 
 var (
 	t   *TestFramework
-	sut sandbox.Sandbox
+	sut *sboxfactory.SandboxFactory
 )
 
 var _ = BeforeSuite(func() {
@@ -30,5 +30,5 @@ var _ = AfterSuite(func() {
 })
 
 var _ = BeforeEach(func() {
-	sut = sandbox.New()
+	sut = sboxfactory.New()
 })

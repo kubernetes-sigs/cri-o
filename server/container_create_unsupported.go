@@ -5,10 +5,10 @@ package server
 import (
 	"fmt"
 
+	"github.com/cri-o/cri-o/internal/ctrfactory"
 	"github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/oci"
-	"github.com/cri-o/cri-o/pkg/container"
-	"github.com/cri-o/cri-o/pkg/sandbox"
+	"github.com/cri-o/cri-o/internal/sboxfactory"
 	"golang.org/x/net/context"
 )
 

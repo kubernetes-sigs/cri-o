@@ -1,4 +1,4 @@
-package container
+package ctrfactory
 
 import (
 	"context"
@@ -12,15 +12,17 @@ import (
 
 	"github.com/containers/libpod/v2/pkg/annotations"
 	"github.com/containers/storage/pkg/stringid"
-	"github.com/cri-o/cri-o/internal/config/device"
+	"github.com/cri-o/cri-o/internal/config/nsmgr"
 	"github.com/cri-o/cri-o/internal/lib"
 	"github.com/cri-o/cri-o/internal/lib/sandbox"
+	libsandbox "github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/log"
 	oci "github.com/cri-o/cri-o/internal/oci"
 	"github.com/cri-o/cri-o/internal/storage"
 	crioann "github.com/cri-o/cri-o/pkg/annotations"
 	"github.com/cri-o/cri-o/server/cri/types"
 	"github.com/cri-o/cri-o/utils"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -29,77 +31,8 @@ import (
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-// Container is the main public container interface
-type Container interface {
-	// All set methods are usually called in order of their definition
-
-	// SetConfig sets the configuration to the container and validates it
-	SetConfig(*types.ContainerConfig, *types.PodSandboxConfig) error
-
-	// SetNameAndID sets a container name and ID
-	SetNameAndID() error
-
-	// Config returns the container CRI configuration
-	Config() *types.ContainerConfig
-
-	// SandboxConfig returns the sandbox CRI configuration
-	SandboxConfig() *types.PodSandboxConfig
-
-	// ID returns the container ID
-	ID() string
-
-	// Name returns the container name
-	Name() string
-
-	// SetPrivileged sets the privileged bool for the container
-	SetPrivileged() error
-
-	// Privileged returns whether this container is privileged
-	Privileged() bool
-
-	// LogPath returns the log path for the container
-	// It takes as input the LogDir of the sandbox, which is used
-	// if there is no LogDir configured in the sandbox CRI config
-	LogPath(string) (string, error)
-
-	// DisableFips returns whether the container should disable fips mode
-	DisableFips() bool
-
-	// Image returns the image specified in the container spec, or an error
-	Image() (string, error)
-
-	// ReadOnly returns whether the rootfs should be readonly
-	// it takes a bool as to whether crio was configured to
-	// be readonly, which it defaults to if the container wasn't
-	// specifically asked to be read only
-	ReadOnly(bool) bool
-
-	// SelinuxLabel returns the container's SelinuxLabel
-	// it takes the sandbox's label, which it falls back upon
-	SelinuxLabel(string) ([]string, error)
-
-	// spec functions
-
-	// returns the spec
-	Spec() *generate.Generator
-
-	// SpecAddMount adds a mount to the container's spec
-	// it takes the rspec mount object
-	// if there is already a mount at the path specified, it removes it.
-	SpecAddMount(rspec.Mount)
-
-	// SpecAddAnnotations adds annotations to the spec.
-	SpecAddAnnotations(ctx context.Context, sandbox *sandbox.Sandbox, containerVolume []oci.ContainerVolume, mountPoint, configStopSignal string, imageResult *storage.ImageResult, isSystemd, systemdHasCollectMode bool) error
-
-	// SpecAddDevices adds devices from the server config, and container CRI config
-	SpecAddDevices([]device.Device, []device.Device, bool) error
-
-	// AddUnifiedResourcesFromAnnotations adds the cgroup-v2 resources specified in the io.kubernetes.cri-o.UnifiedCgroup annotation
-	AddUnifiedResourcesFromAnnotations(annotationsMap map[string]string) error
-}
-
-// container is the hidden default type behind the Container interface
-type container struct {
+// ContainerFactory is the hidden default type behind the Container interface
+type ContainerFactory struct {
 	config     *types.ContainerConfig
 	sboxConfig *types.PodSandboxConfig
 	id         string
@@ -109,24 +42,24 @@ type container struct {
 }
 
 // New creates a new, empty Sandbox instance
-func New() (Container, error) {
+func New() (*ContainerFactory, error) {
 	spec, err := generate.New("linux")
 	if err != nil {
 		return nil, err
 	}
-	return &container{
+	return &ContainerFactory{
 		spec: spec,
 	}, nil
 }
 
 // SpecAddMount adds a specified mount to the spec
-func (c *container) SpecAddMount(r rspec.Mount) {
+func (c *ContainerFactory) SpecAddMount(r rspec.Mount) {
 	c.spec.RemoveMount(r.Destination)
 	c.spec.AddMount(r)
 }
 
 // SpecAddAnnotation adds all annotations to the spec
-func (c *container) SpecAddAnnotations(ctx context.Context, sb *sandbox.Sandbox, containerVolumes []oci.ContainerVolume, mountPoint, configStopSignal string, imageResult *storage.ImageResult, isSystemd, systemdHasCollectMode bool) (err error) {
+func (c *ContainerFactory) SpecAddAnnotations(ctx context.Context, sb *sandbox.Sandbox, containerVolumes []oci.ContainerVolume, mountPoint, configStopSignal string, imageResult *storage.ImageResult, isSystemd, systemdHasCollectMode bool) (err error) {
 	// Copied from k8s.io/kubernetes/pkg/kubelet/kuberuntime/labels.go
 	const podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 
@@ -247,12 +180,13 @@ func (c *container) SpecAddAnnotations(ctx context.Context, sb *sandbox.Sandbox,
 	return nil
 }
 
-func (c *container) Spec() *generate.Generator {
+// Spec returns the container's spec
+func (c *ContainerFactory) Spec() *generate.Generator {
 	return &c.spec
 }
 
 // SetConfig sets the configuration to the container and validates it
-func (c *container) SetConfig(config *types.ContainerConfig, sboxConfig *types.PodSandboxConfig) error {
+func (c *ContainerFactory) SetConfig(config *types.ContainerConfig, sboxConfig *types.PodSandboxConfig) error {
 	if c.config != nil {
 		return errors.New("config already set")
 	}
@@ -283,7 +217,7 @@ func (c *container) SetConfig(config *types.ContainerConfig, sboxConfig *types.P
 }
 
 // SetNameAndID sets a container name and ID
-func (c *container) SetNameAndID() error {
+func (c *ContainerFactory) SetNameAndID() error {
 	if c.config == nil {
 		return errors.New("config is not set")
 	}
@@ -312,27 +246,27 @@ func (c *container) SetNameAndID() error {
 }
 
 // Config returns the container configuration
-func (c *container) Config() *types.ContainerConfig {
+func (c *ContainerFactory) Config() *types.ContainerConfig {
 	return c.config
 }
 
 // SandboxConfig returns the sandbox configuration
-func (c *container) SandboxConfig() *types.PodSandboxConfig {
+func (c *ContainerFactory) SandboxConfig() *types.PodSandboxConfig {
 	return c.sboxConfig
 }
 
 // ID returns the container ID
-func (c *container) ID() string {
+func (c *ContainerFactory) ID() string {
 	return c.id
 }
 
 // Name returns the container name
-func (c *container) Name() string {
+func (c *ContainerFactory) Name() string {
 	return c.name
 }
 
 // SetPrivileged sets the privileged bool for the container
-func (c *container) SetPrivileged() error {
+func (c *ContainerFactory) SetPrivileged() error {
 	if c.config == nil {
 		return nil
 	}
@@ -365,14 +299,14 @@ func (c *container) SetPrivileged() error {
 }
 
 // Privileged returns whether this container is privileged
-func (c *container) Privileged() bool {
+func (c *ContainerFactory) Privileged() bool {
 	return c.privileged
 }
 
 // LogPath returns the log path for the container
 // It takes as input the LogDir of the sandbox, which is used
 // if there is no LogDir configured in the sandbox CRI config
-func (c *container) LogPath(sboxLogDir string) (string, error) {
+func (c *ContainerFactory) LogPath(sboxLogDir string) (string, error) {
 	sboxLogDirConfig := c.sboxConfig.LogDirectory
 	if sboxLogDirConfig != "" {
 		sboxLogDir = sboxLogDirConfig
@@ -401,7 +335,7 @@ func (c *container) LogPath(sboxLogDir string) (string, error) {
 }
 
 // DisableFips returns whether the container should disable fips mode
-func (c *container) DisableFips() bool {
+func (c *ContainerFactory) DisableFips() bool {
 	if value, ok := c.sboxConfig.Labels["FIPS_DISABLE"]; ok && value == "true" {
 		return true
 	}
@@ -409,7 +343,7 @@ func (c *container) DisableFips() bool {
 }
 
 // Image returns the image specified in the container spec, or an error
-func (c *container) Image() (string, error) {
+func (c *ContainerFactory) Image() (string, error) {
 	imageSpec := c.config.Image
 	if imageSpec == nil {
 		return "", errors.New("CreateContainerRequest.ContainerConfig.Image is nil")
@@ -426,7 +360,7 @@ func (c *container) Image() (string, error) {
 // it takes a bool as to whether crio was configured to
 // be readonly, which it defaults to if the container wasn't
 // specifically asked to be read only
-func (c *container) ReadOnly(serverIsReadOnly bool) bool {
+func (c *ContainerFactory) ReadOnly(serverIsReadOnly bool) bool {
 	if c.config.Linux.SecurityContext.ReadonlyRootfs {
 		return true
 	}
@@ -435,7 +369,7 @@ func (c *container) ReadOnly(serverIsReadOnly bool) bool {
 
 // SelinuxLabel returns the container's SelinuxLabel
 // it takes the sandbox's label, which it falls back upon
-func (c *container) SelinuxLabel(sboxLabel string) ([]string, error) {
+func (c *ContainerFactory) SelinuxLabel(sboxLabel string) ([]string, error) {
 	selinuxConfig := c.config.Linux.SecurityContext.SelinuxOptions
 
 	labels := map[string]string{}
@@ -463,7 +397,7 @@ func (c *container) SelinuxLabel(sboxLabel string) ([]string, error) {
 }
 
 // AddUnifiedResourcesFromAnnotations adds the cgroup-v2 resources specified in the io.kubernetes.cri-o.UnifiedCgroup annotation
-func (c *container) AddUnifiedResourcesFromAnnotations(annotationsMap map[string]string) error {
+func (c *ContainerFactory) AddUnifiedResourcesFromAnnotations(annotationsMap map[string]string) error {
 	if c.config == nil || c.config.Labels == nil {
 		return nil
 	}
@@ -504,4 +438,75 @@ func (c *container) AddUnifiedResourcesFromAnnotations(annotationsMap map[string
 	}
 
 	return nil
+}
+
+// SpecSetProcessArgs sets the process args in the spec,
+// given the image information and passed-in container config
+func (c *ContainerFactory) SpecSetProcessArgs(imageOCIConfig *v1.Image) error {
+	kubeCommands := c.config.Command
+	kubeArgs := c.config.Args
+
+	// merge image config and kube config
+	// same as docker does today...
+	if imageOCIConfig != nil {
+		if len(kubeCommands) == 0 {
+			if len(kubeArgs) == 0 {
+				kubeArgs = imageOCIConfig.Config.Cmd
+			}
+			if kubeCommands == nil {
+				kubeCommands = imageOCIConfig.Config.Entrypoint
+			}
+		}
+	}
+
+	// create entrypoint and args
+	var entrypoint string
+	var args []string
+	switch {
+	case len(kubeCommands) != 0:
+		entrypoint = kubeCommands[0]
+		args = kubeCommands[1:]
+		args = append(args, kubeArgs...)
+	case len(kubeArgs) != 0:
+		entrypoint = kubeArgs[0]
+		args = kubeArgs[1:]
+	default:
+		return errors.New("no command specified")
+	}
+
+	c.spec.SetProcessArgs(append([]string{entrypoint}, args...))
+	return nil
+}
+
+// SpecAddNamespaces adds the specified namespace paths
+func (c *ContainerFactory) SpecAddNamespaces(managedNamespaces []*libsandbox.ManagedNamespace) error {
+	typeToSpec := map[nsmgr.NSType]rspec.LinuxNamespaceType{
+		nsmgr.IPCNS:  rspec.IPCNamespace,
+		nsmgr.NETNS:  rspec.NetworkNamespace,
+		nsmgr.UTSNS:  rspec.UTSNamespace,
+		nsmgr.USERNS: rspec.UserNamespace,
+	}
+
+	for _, ns := range managedNamespaces {
+		// allow for empty paths, as this namespace just shouldn't be configured
+		if ns.Path() == "" {
+			continue
+		}
+		nsForSpec := typeToSpec[ns.Type()]
+		if nsForSpec == "" {
+			return errors.Errorf("Invalid namespace type %s", nsForSpec)
+		}
+		err := c.spec.AddOrReplaceLinuxNamespace(string(nsForSpec), ns.Path())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// WillRunSystemd checks whether the process args
+// are configured to be run as a systemd instance.
+func (c *ContainerFactory) WillRunSystemd() bool {
+	entrypoint := c.spec.Config.Process.Args[0]
+	return strings.Contains(entrypoint, "/sbin/init") || (filepath.Base(entrypoint) == "systemd")
 }

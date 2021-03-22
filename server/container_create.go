@@ -11,11 +11,11 @@ import (
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/containers/storage/pkg/mount"
 	"github.com/containers/storage/pkg/stringid"
+	"github.com/cri-o/cri-o/internal/ctrfactory"
 	"github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/log"
 	"github.com/cri-o/cri-o/internal/storage"
 	"github.com/cri-o/cri-o/pkg/config"
-	"github.com/cri-o/cri-o/pkg/container"
 	"github.com/cri-o/cri-o/server/cri/types"
 	"github.com/cri-o/cri-o/utils"
 	securejoin "github.com/cyphar/filepath-securejoin"
@@ -176,54 +176,6 @@ func resolveSymbolicLink(scope, path string) (string, error) {
 		scope = "/"
 	}
 	return securejoin.SecureJoin(scope, path)
-}
-
-// buildOCIProcessArgs build an OCI compatible process arguments slice.
-func buildOCIProcessArgs(ctx context.Context, containerKubeConfig *types.ContainerConfig, imageOCIConfig *v1.Image) ([]string, error) {
-	// # Start the nginx container using the default command, but use custom
-	// arguments (arg1 .. argN) for that command.
-	// kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
-
-	// # Start the nginx container using a different command and custom arguments.
-	// kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
-
-	kubeCommands := containerKubeConfig.Command
-	kubeArgs := containerKubeConfig.Args
-
-	// merge image config and kube config
-	// same as docker does today...
-	if imageOCIConfig != nil {
-		if len(kubeCommands) == 0 {
-			if len(kubeArgs) == 0 {
-				kubeArgs = imageOCIConfig.Config.Cmd
-			}
-			if kubeCommands == nil {
-				kubeCommands = imageOCIConfig.Config.Entrypoint
-			}
-		}
-	}
-
-	if len(kubeCommands) == 0 && len(kubeArgs) == 0 {
-		return nil, fmt.Errorf("no command specified")
-	}
-
-	// create entrypoint and args
-	var entrypoint string
-	var args []string
-	if len(kubeCommands) != 0 {
-		entrypoint = kubeCommands[0]
-		args = kubeCommands[1:]
-		args = append(args, kubeArgs...)
-	} else {
-		entrypoint = kubeArgs[0]
-		args = kubeArgs[1:]
-	}
-
-	processArgs := append([]string{entrypoint}, args...)
-
-	log.Debugf(ctx, "OCI process args %v", processArgs)
-
-	return processArgs, nil
 }
 
 // setupContainerUser sets the UID, GID and supplemental groups in OCI runtime config
@@ -460,9 +412,9 @@ func (s *Server) CreateContainer(ctx context.Context, req *types.CreateContainer
 		return nil, fmt.Errorf("CreateContainer failed as the sandbox was stopped: %s", sb.ID())
 	}
 
-	ctr, err := container.New()
+	ctr, err := ctrfactory.New()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create container")
+		return nil, errors.Wrap(err, "failed to create container factory")
 	}
 
 	if err := ctr.SetConfig(req.Config, req.SandboxConfig); err != nil {

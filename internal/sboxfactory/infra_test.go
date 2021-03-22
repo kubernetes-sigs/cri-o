@@ -1,15 +1,54 @@
-package sandbox_test
+package sboxfactory_test
 
 import (
+	"io/ioutil"
+	"os"
+
+	"github.com/cri-o/cri-o/internal/sboxfactory"
 	"github.com/cri-o/cri-o/pkg/config"
-	"github.com/cri-o/cri-o/pkg/sandbox"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-var _ = Describe("Sandbox", func() {
-	t.Describe("PauseCommand", func() {
+const (
+	defaultDNSPath = "/etc/resolv.conf"
+	testDNSPath    = "fixtures/resolv_test.conf"
+	dnsPath        = "fixtures/resolv.conf"
+)
+
+var _ = Describe("SandboxFactory", func() {
+	Context("ParseDNSOptions", func() {
+		testCases := []struct {
+			Servers, Searches, Options []string
+			Path                       string
+			Want                       string
+		}{
+			{
+				[]string{},
+				[]string{},
+				[]string{},
+				testDNSPath, defaultDNSPath,
+			},
+			{
+				[]string{"cri-o.io", "github.com"},
+				[]string{"192.30.253.113", "192.30.252.153"},
+				[]string{"timeout:5", "attempts:3"},
+				testDNSPath, dnsPath,
+			},
+		}
+
+		for _, c := range testCases {
+			Expect(sboxfactory.ParseDNSOptions(c.Servers, c.Searches, c.Options, c.Path)).To(BeNil())
+			defer os.Remove(c.Path)
+
+			expect, _ := ioutil.ReadFile(c.Want) // nolint: errcheck
+			result, _ := ioutil.ReadFile(c.Path) // nolint: errcheck
+			Expect(result).To(Equal(expect))
+		}
+	})
+
+	Context("PauseCommand", func() {
 		var cfg *config.Config
 
 		BeforeEach(func() {
@@ -21,7 +60,7 @@ var _ = Describe("Sandbox", func() {
 
 		It("should succeed with default config", func() {
 			// When
-			_, err := sandbox.PauseCommand(cfg, nil)
+			_, err := sboxfactory.PauseCommand(cfg, nil)
 
 			// Then
 			Expect(err).To(BeNil())
@@ -34,7 +73,7 @@ var _ = Describe("Sandbox", func() {
 			image := &v1.Image{Config: v1.ImageConfig{Entrypoint: entrypoint}}
 
 			// When
-			res, err := sandbox.PauseCommand(cfg, image)
+			res, err := sboxfactory.PauseCommand(cfg, image)
 
 			// Then
 			Expect(err).To(BeNil())
@@ -48,7 +87,7 @@ var _ = Describe("Sandbox", func() {
 			image := &v1.Image{Config: v1.ImageConfig{Cmd: cmd}}
 
 			// When
-			res, err := sandbox.PauseCommand(cfg, image)
+			res, err := sboxfactory.PauseCommand(cfg, image)
 
 			// Then
 			Expect(err).To(BeNil())
@@ -66,7 +105,7 @@ var _ = Describe("Sandbox", func() {
 			}}
 
 			// When
-			res, err := sandbox.PauseCommand(cfg, image)
+			res, err := sboxfactory.PauseCommand(cfg, image)
 
 			// Then
 			Expect(err).To(BeNil())
@@ -77,7 +116,7 @@ var _ = Describe("Sandbox", func() {
 
 		It("should fail if config is nil", func() {
 			// When
-			res, err := sandbox.PauseCommand(nil, nil)
+			res, err := sboxfactory.PauseCommand(nil, nil)
 
 			// Then
 			Expect(err).NotTo(BeNil())
@@ -89,7 +128,7 @@ var _ = Describe("Sandbox", func() {
 			cfg.PauseCommand = ""
 
 			// When
-			res, err := sandbox.PauseCommand(cfg, nil)
+			res, err := sboxfactory.PauseCommand(cfg, nil)
 
 			// Then
 			Expect(err).NotTo(BeNil())

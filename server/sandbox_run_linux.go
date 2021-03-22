@@ -24,9 +24,9 @@ import (
 	libsandbox "github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/log"
 	oci "github.com/cri-o/cri-o/internal/oci"
+	"github.com/cri-o/cri-o/internal/sboxfactory"
 	ann "github.com/cri-o/cri-o/pkg/annotations"
 	libconfig "github.com/cri-o/cri-o/pkg/config"
-	"github.com/cri-o/cri-o/pkg/sandbox"
 	"github.com/cri-o/cri-o/server/cri/types"
 	"github.com/cri-o/cri-o/utils"
 	json "github.com/json-iterator/go"
@@ -289,7 +289,7 @@ func (s *Server) runPodSandbox(ctx context.Context, req *types.RunPodSandboxRequ
 	s.updateLock.RLock()
 	defer s.updateLock.RUnlock()
 
-	sbox := sandbox.New()
+	sbox := sboxfactory.New()
 	if err := sbox.SetConfig(req.Config); err != nil {
 		return nil, errors.Wrap(err, "setting sandbox config")
 	}
@@ -426,38 +426,8 @@ func (s *Server) runPodSandbox(ctx context.Context, req *types.RunPodSandboxRequ
 	if err := sbox.InitInfraContainer(&s.config, &podContainer); err != nil {
 		return nil, err
 	}
-
 	g := sbox.Spec()
-
-	// set DNS options
-	var resolvPath string
-	if sbox.Config().DNSConfig != nil {
-		dnsServers := sbox.Config().DNSConfig.Servers
-		dnsSearches := sbox.Config().DNSConfig.Searches
-		dnsOptions := sbox.Config().DNSConfig.Options
-		resolvPath = fmt.Sprintf("%s/resolv.conf", podContainer.RunDir)
-		err = parseDNSOptions(dnsServers, dnsSearches, dnsOptions, resolvPath)
-		if err != nil {
-			err1 := removeFile(resolvPath)
-			if err1 != nil {
-				return nil, fmt.Errorf("%v; failed to remove %s: %v", err, resolvPath, err1)
-			}
-			return nil, err
-		}
-		if err := label.Relabel(resolvPath, mountLabel, false); err != nil && !errors.Is(err, unix.ENOTSUP) {
-			if err1 := removeFile(resolvPath); err1 != nil {
-				return nil, fmt.Errorf("%v; failed to remove %s: %v", err, resolvPath, err1)
-			}
-		}
-		mnt := spec.Mount{
-			Type:        "bind",
-			Source:      resolvPath,
-			Destination: "/etc/resolv.conf",
-			Options:     []string{"ro", "bind", "nodev", "nosuid", "noexec"},
-		}
-		pathsToChown = append(pathsToChown, resolvPath)
-		g.AddMount(mnt)
-	}
+	pathsToChown = append(pathsToChown, sbox.ResolvPath())
 
 	// add metadata
 	metadata := sbox.Config().Metadata
@@ -603,7 +573,7 @@ func (s *Server) runPodSandbox(ctx context.Context, req *types.RunPodSandboxRequ
 	g.AddAnnotation(annotations.ShmPath, shmPath)
 	g.AddAnnotation(annotations.PrivilegedRuntime, fmt.Sprintf("%v", privileged))
 	g.AddAnnotation(annotations.RuntimeHandler, runtimeHandler)
-	g.AddAnnotation(annotations.ResolvPath, resolvPath)
+	g.AddAnnotation(annotations.ResolvPath, sbox.ResolvPath())
 	g.AddAnnotation(annotations.HostName, hostname)
 	g.AddAnnotation(annotations.NamespaceOptions, string(nsOptsJSON))
 	g.AddAnnotation(annotations.KubeName, kubeName)
@@ -655,7 +625,7 @@ func (s *Server) runPodSandbox(ctx context.Context, req *types.RunPodSandboxRequ
 		Namespace: metadata.Namespace,
 		Attempt:   metadata.Attempt,
 	}
-	sb, err := libsandbox.New(sbox.ID(), namespace, sbox.Name(), kubeName, logDir, labels, kubeAnnotations, processLabel, mountLabel, sbMetadata, shmPath, cgroupParent, privileged, runtimeHandler, resolvPath, hostname, portMappings, hostNetwork, created, usernsMode)
+	sb, err := libsandbox.New(sbox.ID(), namespace, sbox.Name(), kubeName, logDir, labels, kubeAnnotations, processLabel, mountLabel, sbMetadata, shmPath, cgroupParent, privileged, runtimeHandler, sbox.ResolvPath(), hostname, portMappings, hostNetwork, created, usernsMode)
 	if err != nil {
 		return nil, err
 	}

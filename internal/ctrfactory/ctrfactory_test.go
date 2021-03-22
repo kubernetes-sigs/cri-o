@@ -1,4 +1,4 @@
-package container_test
+package ctrfactory_test
 
 import (
 	"context"
@@ -17,11 +17,12 @@ import (
 	"github.com/cri-o/cri-o/server/cri/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-var _ = t.Describe("Container", func() {
+var _ = t.Describe("ContainerFactory", func() {
 	var config *types.ContainerConfig
 	var sboxConfig *types.PodSandboxConfig
 	const defaultMounts = 6
@@ -343,6 +344,179 @@ var _ = t.Describe("Container", func() {
 			Expect(spec.Config.Linux.Resources.Unified["memory.max"]).To(Equal(""))
 			Expect(spec.Config.Linux.Resources.Unified["memory.min"]).To(Equal(""))
 			Expect(spec.Config.Linux.Resources.Unified["memory.low"]).To(Equal(""))
+		})
+	})
+	t.Describe("SpecSetProcessArgs", func() {
+		It("should fail if empty", func() {
+			// Given
+			config.Command = nil
+			config.Args = nil
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(nil)).NotTo(BeNil())
+		})
+
+		It("should set to command", func() {
+			// Given
+			config.Command = []string{"hello", "world"}
+			config.Args = nil
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(nil)).To(BeNil())
+			Expect(sut.Spec().Config.Process.Args).To(Equal(config.Command))
+		})
+		It("should set to Args", func() {
+			// Given
+			config.Command = nil
+			config.Args = []string{"hello", "world"}
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(nil)).To(BeNil())
+			Expect(sut.Spec().Config.Process.Args).To(Equal(config.Args))
+		})
+		It("should append args and command", func() {
+			// Given
+			config.Command = []string{"hi", "earth"}
+			config.Args = []string{"hello", "world"}
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(nil)).To(BeNil())
+			Expect(sut.Spec().Config.Process.Args).To(Equal(append(config.Command, config.Args...)))
+		})
+		It("should inherit entrypoint from image", func() {
+			// Given
+			config.Command = nil
+			config.Args = []string{"world"}
+			img := &v1.Image{
+				Config: v1.ImageConfig{
+					Entrypoint: []string{"goodbye"},
+				},
+			}
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(img)).To(BeNil())
+			Expect(sut.Spec().Config.Process.Args).To(Equal(append(img.Config.Entrypoint, config.Args...)))
+		})
+		It("should always use Command if specified", func() {
+			// Given
+			config.Command = []string{"hello"}
+			config.Args = nil
+			img := &v1.Image{
+				Config: v1.ImageConfig{
+					Cmd: []string{"mars"},
+				},
+			}
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(img)).To(BeNil())
+			Expect(sut.Spec().Config.Process.Args).To(Equal(config.Command))
+		})
+		It("should inherit cmd from image", func() {
+			// Given
+			config.Command = nil
+			config.Args = nil
+			img := &v1.Image{
+				Config: v1.ImageConfig{
+					Cmd: []string{"mars"},
+				},
+			}
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(img)).To(BeNil())
+			Expect(sut.Spec().Config.Process.Args).To(Equal(img.Config.Cmd))
+		})
+		It("should inherit both from image", func() {
+			// Given
+			config.Command = nil
+			config.Args = nil
+			img := &v1.Image{
+				Config: v1.ImageConfig{
+					Entrypoint: []string{"hello"},
+					Cmd:        []string{"mars"},
+				},
+			}
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(img)).To(BeNil())
+			Expect(sut.Spec().Config.Process.Args).To(Equal(append(img.Config.Entrypoint, img.Config.Cmd...)))
+		})
+	})
+	t.Describe("WillRunSystemd", func() {
+		It("should be considered systemd container if entrypoint is systemd", func() {
+			// Given
+			config.Command = nil
+			config.Args = nil
+			img := &v1.Image{
+				Config: v1.ImageConfig{
+					Entrypoint: []string{"/usr/bin/systemd"},
+				},
+			}
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(img)).To(BeNil())
+			Expect(sut.WillRunSystemd()).To(BeTrue())
+		})
+
+		It("should be considered systemd container if entrypoint is /sbin/init", func() {
+			// Given
+			config.Command = nil
+			config.Args = nil
+			img := &v1.Image{
+				Config: v1.ImageConfig{
+					Entrypoint: []string{"/sbin/init"},
+				},
+			}
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(img)).To(BeNil())
+			Expect(sut.WillRunSystemd()).To(BeTrue())
+		})
+		It("should not be considered systemd container otherwise", func() {
+			// Given
+			config.Command = nil
+			config.Args = nil
+			img := &v1.Image{
+				Config: v1.ImageConfig{
+					Entrypoint: []string{"systemdless"},
+				},
+			}
+
+			// When
+			Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
+
+			// Then
+			Expect(sut.SpecSetProcessArgs(img)).To(BeNil())
+			Expect(sut.WillRunSystemd()).To(BeFalse())
 		})
 	})
 })

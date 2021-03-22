@@ -1,4 +1,4 @@
-package container_test
+package ctrfactory_test
 
 import (
 	"github.com/cri-o/cri-o/server/cri/types"
@@ -7,7 +7,7 @@ import (
 )
 
 // The actual test suite
-var _ = t.Describe("Container:SetConfig", func() {
+var _ = t.Describe("ContainerFactory:SetConfig", func() {
 	It("should succeed", func() {
 		// Given
 		config := &types.ContainerConfig{

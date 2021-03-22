@@ -1,4 +1,4 @@
-package sandbox_test
+package sboxfactory_test
 
 import (
 	"github.com/cri-o/cri-o/server/cri/types"
@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Sandbox", func() {
+var _ = Describe("SandboxFactory", func() {
 	t.Describe("SetConfig", func() {
 		It("should succeed", func() {
 			// Given
