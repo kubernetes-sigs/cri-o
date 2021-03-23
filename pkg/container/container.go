@@ -19,8 +19,10 @@ import (
 	oci "github.com/cri-o/cri-o/internal/oci"
 	"github.com/cri-o/cri-o/internal/storage"
 	crioann "github.com/cri-o/cri-o/pkg/annotations"
+	sconfig "github.com/cri-o/cri-o/pkg/config"
 	"github.com/cri-o/cri-o/server/cri/types"
 	"github.com/cri-o/cri-o/utils"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -83,10 +85,14 @@ type Container interface {
 	// returns the spec
 	Spec() *generate.Generator
 
-	// SpecAddMount adds a mount to the container's spec
+	// AddMount adds a mount to its list of saved mounts.
 	// it takes the rspec mount object
 	// if there is already a mount at the path specified, it removes it.
-	SpecAddMount(rspec.Mount)
+	AddMount(*rspec.Mount)
+
+	// SpecAddMounts configures the container's spec to
+	// add all of the mounts added by AddMount
+	SpecAddMounts()
 
 	// SpecAddAnnotations adds annotations to the spec.
 	SpecAddAnnotations(ctx context.Context, sandbox *sandbox.Sandbox, containerVolume []oci.ContainerVolume, mountPoint, configStopSignal string, imageResult *storage.ImageResult, isSystemd, systemdHasCollectMode bool) error
@@ -96,6 +102,16 @@ type Container interface {
 
 	// AddUnifiedResourcesFromAnnotations adds the cgroup-v2 resources specified in the io.kubernetes.cri-o.UnifiedCgroup annotation
 	AddUnifiedResourcesFromAnnotations(annotationsMap map[string]string) error
+
+	// SpecSetProcessArgs sets the process args in the spec,
+	// given the image information and passed-in container config
+	SpecSetProcessArgs(imageOCIConfig *v1.Image) error
+
+	// WillRunSystemd checks whether the process args
+	// are configured to be run as a systemd instance.
+	WillRunSystemd() bool
+
+	SetupMounts(context.Context, *sconfig.Config, *sandbox.Sandbox, storage.ContainerInfo, string) ([]oci.ContainerVolume, []rspec.Mount, error)
 }
 
 // container is the hidden default type behind the Container interface
@@ -106,6 +122,7 @@ type container struct {
 	name       string
 	privileged bool
 	spec       generate.Generator
+	mounts     map[string]*rspec.Mount
 }
 
 // New creates a new, empty Sandbox instance
@@ -117,12 +134,6 @@ func New() (Container, error) {
 	return &container{
 		spec: spec,
 	}, nil
-}
-
-// SpecAddMount adds a specified mount to the spec
-func (c *container) SpecAddMount(r rspec.Mount) {
-	c.spec.RemoveMount(r.Destination)
-	c.spec.AddMount(r)
 }
 
 // SpecAddAnnotation adds all annotations to the spec
@@ -505,4 +516,57 @@ func (c *container) AddUnifiedResourcesFromAnnotations(annotationsMap map[string
 	}
 
 	return nil
+}
+
+// SpecSetProcessArgs sets the process args in the spec,
+// given the image information and passed-in container config
+func (c *container) SpecSetProcessArgs(imageOCIConfig *v1.Image) error {
+	// # Start the nginx container using the default command, but use custom
+	// arguments (arg1 .. argN) for that command.
+	// kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
+
+	// # Start the nginx container using a different command and custom arguments.
+	// kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
+
+	kubeCommands := c.config.Command
+	kubeArgs := c.config.Args
+
+	// merge image config and kube config
+	// same as docker does today...
+	if imageOCIConfig != nil {
+		if len(kubeCommands) == 0 {
+			if len(kubeArgs) == 0 {
+				kubeArgs = imageOCIConfig.Config.Cmd
+			}
+			if kubeCommands == nil {
+				kubeCommands = imageOCIConfig.Config.Entrypoint
+			}
+		}
+	}
+
+	if len(kubeCommands) == 0 && len(kubeArgs) == 0 {
+		return fmt.Errorf("no command specified")
+	}
+
+	// create entrypoint and args
+	var entrypoint string
+	var args []string
+	if len(kubeCommands) != 0 {
+		entrypoint = kubeCommands[0]
+		args = kubeCommands[1:]
+		args = append(args, kubeArgs...)
+	} else {
+		entrypoint = kubeArgs[0]
+		args = kubeArgs[1:]
+	}
+
+	c.spec.SetProcessArgs(append([]string{entrypoint}, args...))
+	return nil
+}
+
+// WillRunSystemd checks whether the process args
+// are configured to be run as a systemd instance.
+func (c *container) WillRunSystemd() bool {
+	entrypoint := c.spec.Config.Process.Args[0]
+	return strings.Contains(entrypoint, "/sbin/init") || (filepath.Base(entrypoint) == "systemd")
 }

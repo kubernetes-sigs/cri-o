@@ -14,7 +14,6 @@ import (
 
 	encconfig "github.com/containers/ocicrypt/config"
 	cryptUtils "github.com/containers/ocicrypt/utils"
-	"github.com/containers/storage/pkg/mount"
 	"github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/log"
 	"github.com/cri-o/cri-o/server/cri/types"
@@ -278,25 +277,6 @@ func getDecryptionKeys(keysPath string) (*encconfig.DecryptConfig, error) {
 	}
 
 	return encconfig.InitDecryption(sortedDc).DecryptConfig, nil
-}
-
-func getSourceMount(source string, mountinfos []*mount.Info) (path, optional string, _ error) {
-	var res *mount.Info
-
-	for _, mi := range mountinfos {
-		// check if mi can be a parent of source
-		if strings.HasPrefix(source, mi.Mountpoint) {
-			// look for a longest one
-			if res == nil || len(mi.Mountpoint) > len(res.Mountpoint) {
-				res = mi
-			}
-		}
-	}
-	if res == nil {
-		return "", "", fmt.Errorf("could not find source mount of %s", source)
-	}
-
-	return res.Mountpoint, res.Optional, nil
 }
 
 func isContextError(err error) bool {
