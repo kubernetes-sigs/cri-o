@@ -5,8 +5,10 @@ import (
 
 	"github.com/cri-o/cri-o/internal/oci"
 	"github.com/cri-o/cri-o/server/cri/types"
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 )
 
 // The actual test suite
@@ -46,6 +48,13 @@ var _ = t.Describe("ContainerStatsList", func() {
 		It("should succeed", func() {
 			// Given
 			addContainerAndSandbox()
+			// short circuit the call to GraphDriver
+			// it only logs a warning, and we aren't testing it here
+			gomock.InOrder(
+				storeMock.EXPECT().
+					GraphDriver().
+					Return(nil, errors.New("avoid mocking graph driver")),
+			)
 			// When
 			response, err := sut.ListContainerStats(context.Background(),
 				&types.ListContainerStatsRequest{})

@@ -629,6 +629,21 @@ func (mr *MockStoreMockRecorder) Layer(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Layer", reflect.TypeOf((*MockStore)(nil).Layer), arg0)
 }
 
+// LayerBigData mocks base method
+func (m *MockStore) LayerBigData(arg0, arg1 string) (io.ReadCloser, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LayerBigData", arg0, arg1)
+	ret0, _ := ret[0].(io.ReadCloser)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LayerBigData indicates an expected call of LayerBigData
+func (mr *MockStoreMockRecorder) LayerBigData(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LayerBigData", reflect.TypeOf((*MockStore)(nil).LayerBigData), arg0, arg1)
+}
+
 // LayerParentOwners mocks base method
 func (m *MockStore) LayerParentOwners(arg0 string) ([]int, []int, error) {
 	m.ctrl.T.Helper()
@@ -733,6 +748,21 @@ func (m *MockStore) ListImageBigData(arg0 string) ([]string, error) {
 func (mr *MockStoreMockRecorder) ListImageBigData(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImageBigData", reflect.TypeOf((*MockStore)(nil).ListImageBigData), arg0)
+}
+
+// ListLayerBigData mocks base method
+func (m *MockStore) ListLayerBigData(arg0 string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListLayerBigData", arg0)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListLayerBigData indicates an expected call of ListLayerBigData
+func (mr *MockStoreMockRecorder) ListLayerBigData(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLayerBigData", reflect.TypeOf((*MockStore)(nil).ListLayerBigData), arg0)
 }
 
 // Lookup mocks base method
@@ -909,6 +939,20 @@ func (m *MockStore) SetImageBigData(arg0, arg1 string, arg2 []byte, arg3 func([]
 func (mr *MockStoreMockRecorder) SetImageBigData(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetImageBigData", reflect.TypeOf((*MockStore)(nil).SetImageBigData), arg0, arg1, arg2, arg3)
+}
+
+// SetLayerBigData mocks base method
+func (m *MockStore) SetLayerBigData(arg0, arg1 string, arg2 io.Reader) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetLayerBigData", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetLayerBigData indicates an expected call of SetLayerBigData
+func (mr *MockStoreMockRecorder) SetLayerBigData(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLayerBigData", reflect.TypeOf((*MockStore)(nil).SetLayerBigData), arg0, arg1, arg2)
 }
 
 // SetMetadata mocks base method
