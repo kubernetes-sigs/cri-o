@@ -27,4 +27,7 @@ const (
 
 	// OCISeccompBPFHookAnnotation is the annotation used by the OCI seccomp BPF hook for tracing container syscalls
 	OCISeccompBPFHookAnnotation = "io.containers.trace-syscall"
+
+	// ShimSocketPathAnnotation is a container state annotation created by vm runtime
+	ShimSocketPathAnnotation = "shim-sock-path.crio.io"
 )

@@ -17,6 +17,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	"github.com/containers/libpod/v2/pkg/cgroups"
+	crioannotations "github.com/cri-o/cri-o/pkg/annotations"
 	"github.com/cri-o/cri-o/utils"
 	"github.com/cri-o/cri-o/utils/errdefs"
 	"github.com/cri-o/cri-o/utils/fifo"
@@ -232,6 +233,11 @@ func (r *runtimeVM) startRuntimeDaemon(ctx context.Context, c *Container) error 
 
 	// Retrieve the address from the output
 	address := strings.TrimSpace(string(out))
+
+	if c.state.Annotations == nil {
+		c.state.Annotations = make(map[string]string)
+	}
+	c.state.Annotations[crioannotations.ShimSocketPathAnnotation] = address
 
 	// Now the RPC server is running, let's connect to it
 	conn, err := client.Connect(address, client.AnonDialer)
@@ -622,10 +628,21 @@ func (r *runtimeVM) updateContainerStatus(ctx context.Context, c *Container) err
 	logrus.Debug("runtimeVM.updateContainerStatus() start")
 	defer logrus.Debug("runtimeVM.updateContainerStatus() end")
 
-	// This can happen on restore, for example if we switch the runtime type
-	// for a container from "oci" to "vm" for the same runtime.
 	if r.task == nil {
-		return errors.New("runtime not correctly setup")
+		if address, ok := c.state.Annotations[crioannotations.ShimSocketPathAnnotation]; ok {
+			// connect with already running gRPC server
+			conn, err := client.Connect(address, client.AnonDialer)
+			if err != nil {
+				return err
+			}
+
+			options := ttrpc.WithOnClose(func() { conn.Close() })
+			cl := ttrpc.NewClient(conn, options)
+			r.client = cl
+			r.task = task.NewTaskClient(cl)
+		} else {
+			return errors.New("runtime not correctly setup")
+		}
 	}
 
 	response, err := r.task.State(ctx, &task.StateRequest{
