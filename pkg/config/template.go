@@ -345,6 +345,18 @@ allowed_annotations = [
 # Kata Containers with the Firecracker VMM
 #[crio.runtime.runtimes.kata-fc]
 
+#[crio.runtime.workloads.workload-type]
+# cpu_set = "0-1"
+# label = "workload-type.crio.io"
+# cpu_shares_annotation = "cpus.workload-type.crio.io"
+# Where:
+# cpu_set is the CPU set for the workload type
+# label is used to identify the workload type
+# cpu_shares_annotation is the prefix to use for setting cpu shares
+# for the containers in the pod. For the example above, there could be
+# multiple annotations for each container in the pod in the form
+# "cpus.workload-type.crio.io/{container_name}"
+
 # The crio.image table contains settings pertaining to the management of OCI images.
 #
 # CRI-O reads its configured registries defaults from the system wide
