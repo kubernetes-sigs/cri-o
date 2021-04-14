@@ -2,6 +2,7 @@ package config
 
 import (
 	"io"
+	"reflect"
 	"text/template"
 )
 
@@ -485,9 +486,12 @@ func runtimesEqual(a, b Runtimes) bool {
 		return false
 	}
 
-	// only check the name of runtime
-	for key := range a {
-		if _, ok := b[key]; !ok {
+	for key, valueA := range a {
+		valueB, ok := b[key]
+		if !ok {
+			return false
+		}
+		if !reflect.DeepEqual(valueA, valueB) {
 			return false
 		}
 	}
@@ -500,9 +504,12 @@ func workloadsEqual(a, b Workloads) bool {
 		return false
 	}
 
-	// only check the name of workload
-	for key := range a {
-		if _, ok := b[key]; !ok {
+	for key, valueA := range a {
+		valueB, ok := b[key]
+		if !ok {
+			return false
+		}
+		if !reflect.DeepEqual(valueA, valueB) {
 			return false
 		}
 	}
