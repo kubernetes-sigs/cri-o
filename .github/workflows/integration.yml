@@ -9,7 +9,7 @@ on:
   pull_request:
 jobs:
   critest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/setup-go@v2
         with:
@@ -31,7 +31,7 @@ jobs:
           RUN_CRITEST: '1'
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/setup-go@v2
         with:
@@ -52,7 +52,7 @@ jobs:
           JOBS: '2'
 
   test-cgroupfs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/setup-go@v2
         with:
@@ -76,7 +76,7 @@ jobs:
           CONTAINER_CONMON_CGROUP: pod
 
   test-userns:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/setup-go@v2
         with:
