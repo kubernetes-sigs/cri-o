@@ -51,6 +51,15 @@ func crioWipe(c *cli.Context) error {
 		}
 	}
 
+	// If crio is configured to wipe internally (and `--force` wasn't set)
+	// the `crio wipe` command has nothing left to do,
+	// as the remaining work will be done on server startup.
+	if config.InternalWipe && !c.IsSet("force") {
+		return nil
+	}
+
+	logrus.Infof("Internal wipe not set, meaning crio wipe will wipe. In the future, all wipes after reboot will happen when starting the crio server.")
+
 	// if we should not wipe, exit with no error
 	if !shouldWipeContainers {
 		// we should not wipe images without wiping containers
