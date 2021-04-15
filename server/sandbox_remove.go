@@ -75,6 +75,11 @@ func (s *Server) RemovePodSandbox(ctx context.Context, req *pb.RemovePodSandboxR
 		}
 	}
 
+	// Cleanup network resources for this pod
+	if err := s.networkStop(ctx, sb); err != nil {
+		return errors.Wrap(err, "stop pod network")
+	}
+
 	s.removeInfraContainer(podInfraContainer)
 	podInfraContainer.CleanupConmonCgroup()
 
