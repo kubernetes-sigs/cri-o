@@ -128,8 +128,8 @@ func (s *Server) runPodSandbox(ctx context.Context, req *pb.RunPodSandboxRequest
 	}
 	resourceCleaner.Add(func() {
 		log.Infof(ctx, "runSandbox: removing pod sandbox from storage: %s", sbox.ID())
-		if err2 := s.StorageRuntimeServer().RemovePodSandbox(sbox.ID()); err2 != nil {
-			log.Warnf(ctx, "couldn't cleanup pod sandbox %q: %v", sbox.ID(), err2)
+		if err2 := s.StorageRuntimeServer().DeleteContainer(sbox.ID()); err2 != nil {
+			log.Warnf(ctx, "could not cleanup pod sandbox %q: %v", sbox.ID(), err2)
 		}
 	})
 
