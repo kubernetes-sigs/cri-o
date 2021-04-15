@@ -62,6 +62,10 @@ version_file = "{{ .VersionFile }}"
 # only happen when CRI-O has been upgraded
 version_file_persist = "{{ .VersionFilePersist }}"
 
+# InternalWipe is whether CRI-O should wipe containers and images after a reboot when the server starts.
+# If set to false, one must use the external command 'crio wipe' to wipe the containers and images in these situations.
+internal_wipe = {{ .InternalWipe }}
+
 # The crio.api table contains settings for the kubelet/gRPC interface.
 [crio.api]
 

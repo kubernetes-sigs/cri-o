@@ -54,6 +54,10 @@ CRI-O reads its storage defaults from the containers-storage.conf(5) file locate
   It is used to check if crio wipe should wipe images, which should
   only happen when CRI-O has been upgraded
 
+**internal_wipe**=false
+  Whether CRI-O should wipe containers after a reboot and images after an upgrade when the server starts.
+  If set to false, one must run `crio wipe` to wipe the containers and images in these situations.
+
 ## CRIO.API TABLE
 The `crio.api` table contains settings for the kubelet/gRPC interface.
 

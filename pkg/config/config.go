@@ -138,6 +138,10 @@ type RootConfig struct {
 	// VersionFilePersist is the location CRI-O will lay down the version file
 	// that checks whether we've upgraded
 	VersionFilePersist string `toml:"version_file_persist"`
+
+	// InternalWipe is whether CRI-O should wipe containers and images after a reboot when the server starts.
+	// If set to false, one must use the external command `crio wipe` to wipe the containers and images in these situations.
+	InternalWipe bool `toml:"internal_wipe"`
 }
 
 // RuntimeHandler represents each item of the "crio.runtime.runtimes" TOML

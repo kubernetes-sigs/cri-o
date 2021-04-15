@@ -278,6 +278,9 @@ func mergeConfig(config *libconfig.Config, ctx *cli.Context) error {
 	if ctx.IsSet("version-file-persist") {
 		config.VersionFilePersist = ctx.String("version-file-persist")
 	}
+	if ctx.IsSet("internal-wipe") {
+		config.InternalWipe = ctx.Bool("internal-wipe")
+	}
 	if ctx.IsSet("enable-metrics") {
 		config.EnableMetrics = ctx.Bool("enable-metrics")
 	}
@@ -793,6 +796,12 @@ func getCrioFlags(defConf *libconfig.Config) []cli.Flag {
 			Value:     defConf.VersionFile,
 			EnvVars:   []string{"CONTAINER_VERSION_FILE_PERSIST"},
 			TakesFile: true,
+		},
+		&cli.BoolFlag{
+			Name:    "internal-wipe",
+			Usage:   "Whether CRI-O should wipe containers after a reboot and images after an upgrade when the server starts. If set to false, one must run `crio wipe` to wipe the containers and images in these situations.",
+			Value:   defConf.InternalWipe,
+			EnvVars: []string{"CONTAINER_INTERNAL_WIPE"},
 		},
 	}
 }
