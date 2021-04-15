@@ -58,7 +58,7 @@ function test_crio_wiped_images() {
 	run crictl images
 	echo "$output"
 	[ "$status" == 0 ]
-	[[ ! "$output" == *"pause"* ]]
+	[[ ! "$output" == *"$IMAGE_USED"* ]]
 }
 
 function test_crio_did_not_wipe_images() {
@@ -66,19 +66,20 @@ function test_crio_did_not_wipe_images() {
 	run crictl images
 	echo "$output"
 	[ "$status" == 0 ]
-	[[ "$output" == *"pause"* ]]
+	[[ "$output" == *"$IMAGE_USED"* ]]
 }
 
 function start_crio_with_stopped_pod() {
 	start_crio
 
-	run crictl runp "$TESTDATA"/sandbox_config.json
-	echo "$output"
-	[ "$status" -eq 0 ]
+	# it must be everything before the tag, because crictl output won't match (the columns for image and tag are separated by space)
+	IMAGE_USED=$(jq -r .image.image < "$TESTDATA"/container_config.json | cut -f1 -d ':')
 
-	run crictl stopp "$output"
-	echo "$output"
-	[ "$status" -eq 0 ]
+	local pod_id
+	pod_id=$(crictl runp "$TESTDATA"/sandbox_config.json)
+	ctr_id=$(crictl create "$pod_id" "$TESTDATA"/container_config.json "$TESTDATA"/sandbox_config.json)
+	crictl start "$ctr_id"
+	crictl stopp "$pod_id"
 }
 
 @test "remove containers and images when remove both" {
@@ -133,4 +134,63 @@ function start_crio_with_stopped_pod() {
 
 	run_podman_with_args ps -a
 	[[ "$output" == *"test"* ]]
+}
+
+@test "internal_wipe remove containers and images when remove both" {
+	start_crio_with_stopped_pod
+	stop_crio_no_clean
+
+	rm "$CONTAINER_VERSION_FILE"
+	rm "$CONTAINER_VERSION_FILE_PERSIST"
+
+	CONTAINER_INTERNAL_WIPE=true start_crio_no_setup
+	test_crio_wiped_containers
+	test_crio_wiped_images
+}
+
+@test "internal_wipe remove containers when remove temporary" {
+	start_crio_with_stopped_pod
+	stop_crio_no_clean
+
+	rm "$CONTAINER_VERSION_FILE"
+
+	CONTAINER_INTERNAL_WIPE=true start_crio_no_setup
+	test_crio_wiped_containers
+	test_crio_did_not_wipe_images
+}
+
+@test "internal_wipe clear both when remove persist" {
+	start_crio_with_stopped_pod
+	stop_crio_no_clean
+
+	rm "$CONTAINER_VERSION_FILE_PERSIST"
+
+	CONTAINER_INTERNAL_WIPE=true start_crio_no_setup
+	test_crio_wiped_containers
+	test_crio_wiped_images
+}
+
+@test "internal_wipe don't clear podman containers" {
+	if [ -z "$PODMAN_BINARY" ]; then
+		skip "Podman not installed"
+	fi
+
+	start_crio_with_stopped_pod
+	stop_crio_no_clean
+
+	run_podman_with_args run --name test -d quay.io/crio/busybox:latest top
+
+	CONTAINER_INTERNAL_WIPE=true start_crio_no_setup
+
+	run_podman_with_args ps -a | grep test
+}
+
+@test "internal_wipe don't clear containers on a forced restart of crio" {
+	start_crio_with_stopped_pod
+	stop_crio_no_clean "-9" || true
+
+	CONTAINER_INTERNAL_WIPE=true start_crio_no_setup
+
+	test_crio_did_not_wipe_containers
+	test_crio_did_not_wipe_images
 }
