@@ -24,6 +24,7 @@ import (
 	"github.com/cri-o/cri-o/internal/oci"
 	"github.com/cri-o/cri-o/internal/resourcestore"
 	"github.com/cri-o/cri-o/internal/storage"
+	"github.com/cri-o/cri-o/internal/version"
 	libconfig "github.com/cri-o/cri-o/pkg/config"
 	"github.com/cri-o/cri-o/server/metrics"
 	"github.com/fsnotify/fsnotify"
@@ -367,6 +368,8 @@ func New(
 	s.restore(ctx)
 	s.cleanupSandboxesOnShutdown(ctx)
 
+	s.wipeIfAppropriate(ctx)
+
 	var bindAddressStr string
 	bindAddress := net.ParseIP(config.StreamAddress)
 	if bindAddress != nil {
@@ -433,6 +436,64 @@ func New(
 	}
 
 	return s, nil
+}
+
+func (s *Server) wipeIfAppropriate(ctx context.Context) {
+	if !s.config.InternalWipe {
+		return
+	}
+	// First, check if the node was rebooted.
+	// We know this happened because the VersionFile (which lives in a tmpfs)
+	// will not be there.
+	shouldWipeContainers, err := version.ShouldCrioWipe(s.config.VersionFile)
+	if err != nil {
+		logrus.Warnf("error encountered when checking whether cri-o should wipe containers: %v", err)
+	}
+
+	// there are two locations we check before wiping:
+	// one in a temporary directory. This is to check whether the node has rebooted.
+	// if so, we should remove containers
+	// another is needed in a persistent directory. This is to check whether we've upgraded
+	// if we've upgraded, we should wipe images
+	shouldWipeImages, err := version.ShouldCrioWipe(s.config.VersionFilePersist)
+	if err != nil {
+		logrus.Warnf("error encountered when checking whether cri-o should wipe images: %v", err)
+	}
+
+	shouldWipeContainers = shouldWipeContainers || shouldWipeImages
+
+	// First, save the images we should be wiping
+	// We won't remember if we wipe all the containers first
+	var imagesToWipe []string
+	if shouldWipeImages {
+		containers, err := s.ContainerServer.ListContainers()
+		if err != nil {
+			logrus.Warnf("Failed to list containers: %v", err)
+		}
+		for _, c := range containers {
+			imagesToWipe = append(imagesToWipe, c.ImageRef())
+		}
+	}
+
+	if shouldWipeContainers {
+		for _, sb := range s.ContainerServer.ListSandboxes() {
+			err := s.stopPodSandbox(ctx, sb)
+			if err == nil {
+				err = s.removePodSandbox(ctx, sb)
+			}
+			if err != nil {
+				logrus.Warnf("Failed to cleanup pod %s: %v", sb.ID(), err)
+			}
+		}
+	}
+
+	if shouldWipeImages {
+		for _, img := range imagesToWipe {
+			if err := s.removeImage(ctx, img); err != nil {
+				logrus.Warnf("failed to remove image %s: %v", img, err)
+			}
+		}
+	}
 }
 
 func (s *Server) addSandbox(sb *sandbox.Sandbox) error {
