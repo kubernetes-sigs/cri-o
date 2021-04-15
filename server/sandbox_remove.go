@@ -28,33 +28,39 @@ func (s *Server) RemovePodSandbox(ctx context.Context, req *pb.RemovePodSandboxR
 		log.Warnf(ctx, "could not get sandbox %s, it's probably been removed already: %v", req.PodSandboxId, err)
 		return &pb.RemovePodSandboxResponse{}, nil
 	}
+	if err := s.removePodSandbox(ctx, sb); err != nil {
+		return nil, err
+	}
+	return &pb.RemovePodSandboxResponse{}, nil
+}
 
+func (s *Server) removePodSandbox(ctx context.Context, sb *sandbox.Sandbox) error {
 	containers := sb.Containers().List()
 
 	// Delete all the containers in the sandbox
 	for _, c := range containers {
 		if err := s.removeContainerInPod(ctx, sb, c); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	s.removeInfraContainer(sb.InfraContainer())
 	if err := s.removeContainerInPod(ctx, sb, sb.InfraContainer()); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Cleanup network resources for this pod
 	if err := s.networkStop(ctx, sb); err != nil {
-		return nil, errors.Wrap(err, "stop pod network")
+		return errors.Wrap(err, "stop pod network")
 	}
 
 	if err := sb.UnmountShm(); err != nil {
-		return nil, errors.Wrap(err, "unable to unmount SHM")
+		return errors.Wrap(err, "unable to unmount SHM")
 	}
 
 	if s.config.ManageNSLifecycle {
 		if err := sb.RemoveManagedNamespaces(); err != nil {
-			return nil, errors.Wrap(err, "unable to remove managed namespaces")
+			return errors.Wrap(err, "unable to remove managed namespaces")
 		}
 	}
 
@@ -63,11 +69,11 @@ func (s *Server) RemovePodSandbox(ctx context.Context, req *pb.RemovePodSandboxR
 		log.Warnf(ctx, "failed to remove sandbox: %v", err)
 	}
 	if err := s.PodIDIndex().Delete(sb.ID()); err != nil {
-		return nil, fmt.Errorf("failed to delete pod sandbox %s from index: %v", sb.ID(), err)
+		return fmt.Errorf("failed to delete pod sandbox %s from index: %v", sb.ID(), err)
 	}
 
 	log.Infof(ctx, "Removed pod sandbox: %s", sb.ID())
-	return &pb.RemovePodSandboxResponse{}, nil
+	return nil
 }
 
 func (s *Server) removeContainerInPod(ctx context.Context, sb *sandbox.Sandbox, c *oci.Container) error {
