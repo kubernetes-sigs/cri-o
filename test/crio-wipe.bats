@@ -194,3 +194,36 @@ function start_crio_with_stopped_pod() {
 	test_crio_did_not_wipe_containers
 	test_crio_did_not_wipe_images
 }
+
+@test "internal_wipe eventually cleans network on forced restart of crio if network is slow to come up" {
+	CNI_RESULTS_DIR=/var/lib/cni/results
+
+	start_crio
+
+	pod_id=$(crictl runp "$TESTDATA"/sandbox_config.json)
+	ctr_id=$(crictl create "$pod_id" "$TESTDATA"/container_config.json "$TESTDATA"/sandbox_config.json)
+	crictl start "$ctr_id"
+
+	stop_crio_no_clean
+
+	runtime kill "$ctr_id" || true
+	runtime kill "$pod_id" || true
+
+	# pretend like the CNI plugin is waiting for a container to start
+	mv "$CRIO_CNI_PLUGIN"/"$CNI_TYPE" "$CRIO_CNI_PLUGIN"/"$CNI_TYPE"-hidden
+	rm "$CONTAINER_VERSION_FILE"
+
+	CONTAINER_INTERNAL_WIPE=true start_crio_no_setup
+
+	# allow cri-o to catchup
+	sleep 5s
+
+	# pretend like the CNI container has started
+	mv "$CRIO_CNI_PLUGIN"/"$CNI_TYPE"-hidden "$CRIO_CNI_PLUGIN"/"$CNI_TYPE"
+
+	# allow cri-o to catch up
+	sleep 5s
+
+	# make sure network resources were cleaned up
+	! ls "$CNI_RESULTS_DIR"/*"$pod_id"*
+}
