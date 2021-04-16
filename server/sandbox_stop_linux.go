@@ -25,13 +25,13 @@ func (s *Server) stopPodSandbox(ctx context.Context, sb *sandbox.Sandbox) error 
 		return err
 	}
 
-	// Get high-performance runtime hook to trigger preStop step for each container
-	hooks := runtimehandlerhooks.GetRuntimeHandlerHooks(sb.RuntimeHandler())
-
 	if sb.Stopped() {
 		log.Infof(ctx, "Stopped pod sandbox (already stopped): %s", sb.ID())
 		return nil
 	}
+
+	// Get high-performance runtime hook to trigger preStop step for each container
+	hooks := runtimehandlerhooks.GetRuntimeHandlerHooks(sb.RuntimeHandler())
 
 	podInfraContainer := sb.InfraContainer()
 	containers := sb.Containers().List()
