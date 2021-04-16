@@ -498,7 +498,9 @@ func (s *Server) CreateContainer(ctx context.Context, req *pb.CreateContainerReq
 		if retErr == nil || isContextError(retErr) {
 			return
 		}
-		resourceCleaner.Cleanup()
+		if err := resourceCleaner.Cleanup(); err != nil {
+			log.Errorf(ctx, "Unable to cleanup: %v", err)
+		}
 	}()
 
 	if _, err = s.ReserveContainerName(ctr.ID(), ctr.Name()); err != nil {
@@ -509,49 +511,61 @@ func (s *Server) CreateContainer(ctx context.Context, req *pb.CreateContainerReq
 		return nil, errors.Wrapf(err, resourceErr.Error())
 	}
 
-	resourceCleaner.Add(func() {
-		log.Infof(ctx, "createCtr: releasing container name %s", ctr.Name())
+	description := fmt.Sprintf("createCtr: releasing container name %s", ctr.Name())
+	resourceCleaner.Add(ctx, description, func() error {
+		log.Infof(ctx, description)
 		s.ReleaseContainerName(ctr.Name())
+		return nil
 	})
 
 	newContainer, err := s.createSandboxContainer(ctx, ctr, sb)
 	if err != nil {
 		return nil, err
 	}
-	resourceCleaner.Add(func() {
-		log.Infof(ctx, "createCtr: deleting container %s from storage", ctr.ID())
+	description = fmt.Sprintf("createCtr: deleting container %s from storage", ctr.ID())
+	resourceCleaner.Add(ctx, description, func() error {
+		log.Infof(ctx, description)
 		err2 := s.StorageRuntimeServer().DeleteContainer(ctr.ID())
 		if err2 != nil {
 			log.Warnf(ctx, "Failed to cleanup container directory: %v", err2)
 		}
+		return err2
 	})
 
 	s.addContainer(newContainer)
-	resourceCleaner.Add(func() {
-		log.Infof(ctx, "createCtr: removing container %s", newContainer.ID())
+	description = fmt.Sprintf("createCtr: removing container %s", newContainer.ID())
+	resourceCleaner.Add(ctx, description, func() error {
+		log.Infof(ctx, description)
 		s.removeContainer(newContainer)
+		return nil
 	})
 
 	if err := s.CtrIDIndex().Add(ctr.ID()); err != nil {
 		return nil, err
 	}
-	resourceCleaner.Add(func() {
-		log.Infof(ctx, "createCtr: deleting container ID %s from idIndex", ctr.ID())
-		if err2 := s.CtrIDIndex().Delete(ctr.ID()); err2 != nil {
+	description = fmt.Sprintf("createCtr: deleting container ID %s from idIndex", ctr.ID())
+	resourceCleaner.Add(ctx, description, func() error {
+		log.Infof(ctx, description)
+		err := s.CtrIDIndex().Delete(ctr.ID())
+		if err != nil {
 			log.Warnf(ctx, "couldn't delete ctr id %s from idIndex", ctr.ID())
 		}
+		return err
 	})
 
 	if err := s.createContainerPlatform(newContainer, sb.CgroupParent()); err != nil {
 		return nil, err
 	}
-	resourceCleaner.Add(func() {
+	description = fmt.Sprintf("createCtr: removing container ID %s from runtime", ctr.ID())
+	resourceCleaner.Add(ctx, description, func() error {
 		if retErr != nil {
-			log.Infof(ctx, "createCtr: removing container ID %s from runtime", ctr.ID())
-			if err2 := s.Runtime().DeleteContainer(newContainer); err2 != nil {
+			log.Infof(ctx, description)
+			if err := s.Runtime().DeleteContainer(newContainer); err != nil {
 				log.Warnf(ctx, "failed to delete container in runtime %s: %v", ctr.ID(), err)
+				return err
 			}
 		}
+		return nil
 	})
 
 	if err := s.ContainerStateToDisk(newContainer); err != nil {

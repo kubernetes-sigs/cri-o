@@ -114,7 +114,9 @@ func (rc *ResourceStore) cleanupStaleResources() {
 
 		for _, r := range resourcesToReap {
 			logrus.Infof("cleaning up stale resource %s", r.name)
-			r.cleaner.Cleanup()
+			if err := r.cleaner.Cleanup(); err != nil {
+				logrus.Errorf("Unable to cleanup: %v", err)
+			}
 		}
 	}
 }

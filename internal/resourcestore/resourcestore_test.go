@@ -6,6 +6,7 @@ import (
 	"github.com/cri-o/cri-o/internal/resourcestore"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -117,8 +118,9 @@ var _ = t.Describe("ResourceStore", func() {
 			sut = resourcestore.NewWithTimeout(timeout)
 
 			timedOutChan := make(chan bool)
-			cleaner.Add(func() {
+			cleaner.Add(context.Background(), "test", func() error {
 				timedOutChan <- true
+				return nil
 			})
 			go func() {
 				time.Sleep(timeout * 3)
