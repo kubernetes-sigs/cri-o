@@ -19,6 +19,7 @@ import (
 	"github.com/containers/podman/v3/pkg/rootless"
 	"github.com/containers/storage"
 	"github.com/cri-o/cri-o/internal/config/apparmor"
+	"github.com/cri-o/cri-o/internal/config/blockio"
 	"github.com/cri-o/cri-o/internal/config/capabilities"
 	"github.com/cri-o/cri-o/internal/config/cgmgr"
 	"github.com/cri-o/cri-o/internal/config/conmonmgr"
@@ -351,6 +352,9 @@ type RuntimeConfig struct {
 	// apparmorConfig is the internal AppArmor configuration
 	apparmorConfig *apparmor.Config
 
+	// blockioConfig is the internal blockio configuration
+	blockioConfig *blockio.Config
+
 	// ulimitConfig is the internal ulimit configuration
 	ulimitsConfig *ulimits.Config
 
@@ -673,6 +677,7 @@ func DefaultConfig() (*Config, error) {
 			NamespacesDir:            defaultNamespacesDir,
 			seccompConfig:            seccomp.New(),
 			apparmorConfig:           apparmor.New(),
+			blockioConfig:            blockio.New(),
 			ulimitsConfig:            ulimits.New(),
 			cgroupManager:            cgroupManager,
 			deviceConfig:             device.New(),
@@ -936,6 +941,11 @@ func (c *RuntimeConfig) Validate(systemContext *types.SystemContext, onExecution
 		if err := c.apparmorConfig.LoadProfile(c.ApparmorProfile); err != nil {
 			return errors.Wrap(err, "unable to load AppArmor profile")
 		}
+
+		if err := c.blockioConfig.Load(c.BlockIOConfigFile); err != nil {
+			return errors.Wrap(err, "blockio configuration")
+		}
+
 		cgroupManager, err := cgmgr.SetCgroupManager(c.CgroupManagerName)
 		if err != nil {
 			return errors.Wrap(err, "unable to update cgroup manager")
@@ -1006,6 +1016,11 @@ func (c *RuntimeConfig) Seccomp() *seccomp.Config {
 // AppArmor returns the AppArmor configuration
 func (c *RuntimeConfig) AppArmor() *apparmor.Config {
 	return c.apparmorConfig
+}
+
+// BlockIO returns the blockio configuration
+func (c *RuntimeConfig) BlockIO() *blockio.Config {
+	return c.blockioConfig
 }
 
 // CgroupManager returns the CgroupManager configuration

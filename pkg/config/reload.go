@@ -81,6 +81,9 @@ func (c *Config) Reload() error {
 	if err := c.ReloadAppArmorProfile(newConfig); err != nil {
 		return err
 	}
+	if err := c.ReloadBlockIOConfig(newConfig); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -194,6 +197,17 @@ func (c *Config) ReloadAppArmorProfile(newConfig *Config) error {
 		}
 		c.ApparmorProfile = newConfig.ApparmorProfile
 		logConfig("apparmor_profile", c.ApparmorProfile)
+	}
+	return nil
+}
+// ReloadBlockIOConfig reloads the blockio configuration from the new config
+func (c *Config) ReloadBlockIOConfig(newConfig *Config) error {
+	if c.BlockIOConfigFile != newConfig.BlockIOConfigFile {
+		if err := c.BlockIO().Load(newConfig.BlockIOConfigFile); err != nil {
+			return errors.Wrap(err, "unable to reload blockio_config_file")
+		}
+		c.BlockIOConfigFile = newConfig.BlockIOConfigFile
+		logConfig("blockio_config_file", c.BlockIOConfigFile)
 	}
 	return nil
 }
