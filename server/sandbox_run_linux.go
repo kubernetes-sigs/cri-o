@@ -672,7 +672,8 @@ func (s *Server) runPodSandbox(ctx context.Context, req *pb.RunPodSandboxRequest
 			log.Warnf(ctx, "failed to stop container %s: %v", container.Name(), err2)
 			return err2
 		}
-		if err2 := s.Runtime().WaitContainerStateStopped(ctx, container); err2 != nil {
+		// use background context, because it will unconditionally fail if we've already timed out.
+		if err2 := s.Runtime().WaitContainerStateStopped(context.Background(), container); err2 != nil {
 			log.Warnf(ctx, "failed to get container 'stopped' status %s in pod sandbox %s: %v", container.Name(), sb.ID(), err2)
 			return err2
 		}
