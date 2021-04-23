@@ -9,6 +9,13 @@ import (
 	"strings"
 
 	"github.com/containers/podman/v3/pkg/cgroups"
+	"github.com/containers/podman/v3/pkg/rootless"
+	"github.com/cri-o/cri-o/internal/config/node"
+	libctr "github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
+	cgcfgs "github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/devices"
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -99,4 +106,40 @@ func (*CgroupfsManager) MoveConmonToCgroup(cid, cgroupParent, conmonCgroup strin
 // CreateSandboxCgroup calls the helper function createSandboxCgroup for this manager.
 func (m *CgroupfsManager) CreateSandboxCgroup(sbParent, containerID string) error {
 	return createSandboxCgroup(sbParent, containerID, m)
+}
+
+// RemoveSandboxCgroup calls the helper function removeSandboxCgroup for this manager.
+func (m *CgroupfsManager) RemoveSandboxCgroup(sbParent, containerID string) error {
+	return removeSandboxCgroup(sbParent, containerID, m)
+}
+
+// Apply applies the Cgroup settings to the cgroup sbParent
+func (m *CgroupfsManager) Apply(sbParent string, cg *cgcfgs.Cgroup) error {
+	var mgr libctr.Manager
+
+	paths := map[string]string{
+		"cpuset":  filepath.Join("/sys/fs/cgroup", "cpuset", sbParent),
+		"cpu":     filepath.Join("/sys/fs/cgroup", "cpu", sbParent),
+		"freezer": filepath.Join("/sys/fs/cgroup", "freezer", sbParent),
+		"devices": filepath.Join("/sys/fs/cgroup", "devices", sbParent),
+	}
+
+	// We need to white list all devices
+	// so containers created underneath won't fail
+	cg.Resources.Devices = []*devices.Rule{
+		{
+			Type:  devices.WildcardDevice,
+			Allow: true,
+		},
+	}
+	if node.CgroupIsV2() {
+		var err error
+		mgr, err = fs2.NewManager(cg, sbParent, rootless.IsRootless())
+		if err != nil {
+			return err
+		}
+	} else {
+		mgr = fs.NewManager(cg, paths, rootless.IsRootless())
+	}
+	return mgr.Set(&cgcfgs.Config{Cgroups: cg})
 }

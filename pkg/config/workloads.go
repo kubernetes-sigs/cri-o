@@ -3,6 +3,8 @@ package config
 import (
 	"strconv"
 
+	"github.com/cri-o/cri-o/internal/config/cgmgr"
+	cgcfgs "github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/pkg/errors"
 	libresource "k8s.io/apimachinery/pkg/api/resource"
@@ -82,6 +84,37 @@ func (w Workloads) MutateSpecGivenAnnotations(ctrName string, specgen *generate.
 	return nil
 }
 
+func (w Workloads) MutateCgroupGivenAnnotations(mgr cgmgr.CgroupManager, sbParent string, sboxAnnotations map[string]string) error {
+	workload := w.workloadGivenActivationAnnotation(sboxAnnotations)
+	if workload == nil {
+		return nil
+	}
+	cgroup := &cgcfgs.Cgroup{
+		Name:      sbParent,
+		Resources: &cgcfgs.Resources{},
+	}
+	for resource, defaultValue := range workload.Resources {
+		value := valueFromAnnotation(resource, defaultValue, workload.AnnotationPrefix, "POD", sboxAnnotations)
+		if value == "" {
+			continue
+		}
+
+		m, ok := mutators[resource]
+		if !ok {
+			// CRI-O bug
+			panic(errors.Errorf("resource %s is not defined", resource))
+		}
+
+		if err := m.MutateCgroup(cgroup, value); err != nil {
+			return errors.Wrapf(err, "mutating spec given workload %s", workload.ActivationAnnotation)
+		}
+	}
+	if err := mgr.Apply(sbParent, cgroup); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (w Workloads) workloadGivenActivationAnnotation(sboxAnnotations map[string]string) *WorkloadConfig {
 	for _, wc := range w {
 		for annotation := range sboxAnnotations {
@@ -110,6 +143,7 @@ var mutators = map[string]Mutator{
 type Mutator interface {
 	ValidateDefault(string) error
 	MutateSpec(*generate.Generator, string) error
+	MutateCgroup(*cgcfgs.Cgroup, string) error
 }
 
 type cpusetMutator struct{}
@@ -124,6 +158,18 @@ func (m *cpusetMutator) ValidateDefault(set string) error {
 
 func (*cpusetMutator) MutateSpec(specgen *generate.Generator, configuredValue string) error {
 	specgen.SetLinuxResourcesCPUCpus(configuredValue)
+	return nil
+}
+
+func (*cpusetMutator) MutateCgroup(cgroup *cgcfgs.Cgroup, configuredValue string) error {
+	if cgroup == nil {
+		cgroup = &cgcfgs.Cgroup{}
+	}
+	if cgroup.Resources == nil {
+		cgroup.Resources = &cgcfgs.Resources{}
+	}
+	cgroup.Resources.CpusetCpus = configuredValue
+
 	return nil
 }
 
@@ -145,5 +191,22 @@ func (*cpuShareMutator) MutateSpec(specgen *generate.Generator, configuredValue 
 		return err
 	}
 	specgen.SetLinuxResourcesCPUShares(u)
+	return nil
+}
+
+func (*cpuShareMutator) MutateCgroup(cgroup *cgcfgs.Cgroup, configuredValue string) error {
+	u, err := strconv.ParseUint(configuredValue, 0, 64)
+	if err != nil {
+		return err
+	}
+
+	if cgroup == nil {
+		cgroup = &cgcfgs.Cgroup{}
+	}
+	if cgroup.Resources == nil {
+		cgroup.Resources = &cgcfgs.Resources{}
+	}
+
+	cgroup.Resources.CpuShares = u
 	return nil
 }

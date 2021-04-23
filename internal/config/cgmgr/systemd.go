@@ -8,10 +8,15 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containers/podman/v3/pkg/rootless"
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
+	"github.com/cri-o/cri-o/internal/config/node"
 	"github.com/cri-o/cri-o/utils"
 	"github.com/godbus/dbus/v5"
+	libctr "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/systemd"
+	cgcfgs "github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/devices"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -129,4 +134,41 @@ func convertCgroupFsNameToSystemd(cgroupfsName string) string {
 // CreateSandboxCgroup calls the helper function createSandboxCgroup for this manager.
 func (m *SystemdManager) CreateSandboxCgroup(sbParent, containerID string) error {
 	return createSandboxCgroup(sbParent, containerID, m)
+}
+
+// RemoveSandboxCgroup calls the helper function removeSandboxCgroup for this manager.
+func (m *SystemdManager) RemoveSandboxCgroup(sbParent, containerID string) error {
+	return removeSandboxCgroup(sbParent, containerID, m)
+}
+
+// Apply applies the Cgroup settings to the cgroup sbParent
+func (m *SystemdManager) Apply(sbParent string, cg *cgcfgs.Cgroup) error {
+	var mgr libctr.Manager
+
+	slicePath, err := systemd.ExpandSlice(sbParent)
+	if err != nil {
+		return errors.Wrapf(err, "expanding systemd slice path for %q", sbParent)
+	}
+
+	paths := map[string]string{
+		"cpuset":  filepath.Join("/sys/fs/cgroup", "cpuset", slicePath),
+		"cpu":     filepath.Join("/sys/fs/cgroup", "cpu", slicePath),
+		"freezer": filepath.Join("/sys/fs/cgroup", "freezer", slicePath),
+	}
+
+	// We need to white list all devices
+	// so containers created underneath won't fail
+	cg.Resources.Devices = []*devices.Rule{
+		{
+			Type:  devices.WildcardDevice,
+			Allow: true,
+		},
+	}
+
+	if node.CgroupIsV2() {
+		mgr = systemd.NewUnifiedManager(cg, sbParent, rootless.IsRootless())
+	} else {
+		mgr = systemd.NewLegacyManager(cg, paths)
+	}
+	return mgr.Set(&cgcfgs.Config{Cgroups: cg})
 }

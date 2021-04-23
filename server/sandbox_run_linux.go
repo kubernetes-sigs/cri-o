@@ -814,6 +814,10 @@ func (s *Server) runPodSandbox(ctx context.Context, req *types.RunPodSandboxRequ
 		strings.Contains(strings.ToLower(runtimeHandler), "kata") ||
 		(runtimeHandler == "" && strings.Contains(strings.ToLower(s.config.DefaultRuntime), "kata"))
 
+	if err := s.config.Workloads.MutateCgroupGivenAnnotations(s.config.CgroupManager(), cgroupParent, sb.Annotations()); err != nil {
+		return nil, err
+	}
+
 	var container *oci.Container
 	// In the case of kernel separated containers, we need the infra container to create the VM for the pod
 	if sb.NeedsInfra(s.config.DropInfraCtr) || podIsKernelSeparated {
@@ -842,6 +846,12 @@ func (s *Server) runPodSandbox(ctx context.Context, req *types.RunPodSandboxRequ
 		if err := s.config.CgroupManager().CreateSandboxCgroup(cgroupParent, sbox.ID()); err != nil {
 			return nil, errors.Wrapf(err, "create dropped infra %s cgroup", sbox.ID())
 		}
+		resourceCleaner.Add(func() {
+			log.Infof(ctx, "runSandbox: cleaning up sandbox cgroup after failing to run sandbox %s", sbox.ID())
+			if err := s.config.CgroupManager().RemoveSandboxCgroup(cgroupParent, sbox.ID()); err != nil {
+				log.Errorf(ctx, "failed to remove sandbox cgroup for %s: %v", sbox.ID(), err)
+			}
+		})
 	}
 	// needed for getSandboxIDMappings()
 	container.SetIDMappings(sandboxIDMappings)

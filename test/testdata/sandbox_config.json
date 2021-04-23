@@ -31,7 +31,7 @@
 		"security.alpha.kubernetes.io/seccomp/pod": "unconfined"
 	},
 	"linux": {
-		"cgroup_parent": "pod_123-456.slice",
+		"cgroup_parent": "pod_123-456",
 		"security_context": {
 			"namespace_options": {
 				"network": 0,
