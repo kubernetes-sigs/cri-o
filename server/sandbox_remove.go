@@ -44,6 +44,10 @@ func (s *Server) removePodSandbox(ctx context.Context, sb *sandbox.Sandbox) erro
 		}
 	}
 
+	if err := sb.UnmountShm(); err != nil {
+		return errors.Wrap(err, "unable to unmount SHM")
+	}
+
 	s.removeInfraContainer(sb.InfraContainer())
 	if err := s.removeContainerInPod(ctx, sb, sb.InfraContainer()); err != nil {
 		return err
@@ -52,10 +56,6 @@ func (s *Server) removePodSandbox(ctx context.Context, sb *sandbox.Sandbox) erro
 	// Cleanup network resources for this pod
 	if err := s.networkStop(ctx, sb); err != nil {
 		return errors.Wrap(err, "stop pod network")
-	}
-
-	if err := sb.UnmountShm(); err != nil {
-		return errors.Wrap(err, "unable to unmount SHM")
 	}
 
 	if s.config.ManageNSLifecycle {
