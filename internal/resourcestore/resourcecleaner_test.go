@@ -79,4 +79,27 @@ var _ = t.Describe("ResourceCleaner", func() {
 		Expect(err).NotTo(BeNil())
 		Expect(failureCnt).To(Equal(3))
 	})
+
+	It("should run in parallel", func() {
+		// Given
+		sut := resourcestore.NewResourceCleaner()
+		testChan := make(chan bool, 1)
+		succ := false
+		sut.Add(context.Background(), "test1", func() error {
+			testChan <- true
+			return nil
+		})
+		sut.Add(context.Background(), "test2", func() error {
+			<-testChan
+			succ = true
+			return nil
+		})
+
+		// When
+		err := sut.Cleanup()
+
+		// Then
+		Expect(err).To(BeNil())
+		Expect(succ).To(BeTrue())
+	})
 })
