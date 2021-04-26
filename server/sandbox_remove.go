@@ -78,16 +78,8 @@ func (s *Server) removePodSandbox(ctx context.Context, sb *sandbox.Sandbox) erro
 
 func (s *Server) removeContainerInPod(ctx context.Context, sb *sandbox.Sandbox, c *oci.Container) error {
 	if !sb.Stopped() {
-		cState := c.State()
-		if cState.Status == oci.ContainerStateCreated || cState.Status == oci.ContainerStateRunning {
-			timeout := int64(10)
-			if err := s.Runtime().StopContainer(ctx, c, timeout); err != nil {
-				// Assume container is already stopped
-				log.Warnf(ctx, "failed to stop container %s: %v", c.Name(), err)
-			}
-			if err := s.Runtime().WaitContainerStateStopped(ctx, c); err != nil {
-				return fmt.Errorf("failed to get container 'stopped' status %s in pod sandbox %s: %v", c.Name(), sb.ID(), err)
-			}
+		if err := s.ContainerServer.StopContainer(ctx, c, int64(10)); err != nil {
+			return errors.Errorf("failed to stop container for removal")
 		}
 	}
 

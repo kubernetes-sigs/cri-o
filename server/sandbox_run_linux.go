@@ -668,15 +668,10 @@ func (s *Server) runPodSandbox(ctx context.Context, req *pb.RunPodSandboxRequest
 	resourceCleaner.Add(ctx, description, func() error {
 		// Clean-up steps from RemovePodSanbox
 		log.Infof(ctx, description)
-		if err2 := s.Runtime().StopContainer(ctx, container, int64(10)); err2 != nil {
-			log.Warnf(ctx, "failed to stop container %s: %v", container.Name(), err2)
-			return err2
+		if err := s.ContainerServer.StopContainer(ctx, container, int64(10)); err != nil {
+			return errors.Errorf("failed to stop container for removal")
 		}
-		// use background context, because it will unconditionally fail if we've already timed out.
-		if err2 := s.Runtime().WaitContainerStateStopped(context.Background(), container); err2 != nil {
-			log.Warnf(ctx, "failed to get container 'stopped' status %s in pod sandbox %s: %v", container.Name(), sb.ID(), err2)
-			return err2
-		}
+
 		log.Infof(ctx, "runSandbox: deleting container %s", container.ID())
 		if err2 := s.Runtime().DeleteContainer(container); err2 != nil {
 			log.Warnf(ctx, "failed to delete container %s in pod sandbox %s: %v", container.Name(), sb.ID(), err2)
