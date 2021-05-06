@@ -35,6 +35,8 @@ import (
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -272,6 +274,10 @@ func (s *Server) runPodSandbox(ctx context.Context, req *types.RunPodSandboxRequ
 	s.updateLock.RLock()
 	defer s.updateLock.RUnlock()
 
+	tracer := otel.GetTracerProvider().Tracer(s.tracerName)
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "run-pod-sandbox")
+	defer span.End()
 	sbox := sandbox.New()
 	if err := sbox.SetConfig(req.Config); err != nil {
 		return nil, errors.Wrap(err, "setting sandbox config")
