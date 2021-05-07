@@ -164,6 +164,9 @@ func mergeConfig(config *libconfig.Config, ctx *cli.Context) error {
 	if ctx.IsSet("apparmor-profile") {
 		config.ApparmorProfile = ctx.String("apparmor-profile")
 	}
+	if ctx.IsSet("blockio-config-file") {
+		config.BlockIOConfigFile = ctx.String("blockio-config-file")
+	}
 	if ctx.IsSet("irqbalance-config-file") {
 		config.IrqBalanceConfigFile = ctx.String("irqbalance-config-file")
 	}
@@ -550,6 +553,11 @@ func getCrioFlags(defConf *libconfig.Config) []cli.Flag {
 			Usage:   "Name of the apparmor profile to be used as the runtime's default. This only takes effect if the user does not specify a profile via the Kubernetes Pod's metadata annotation.",
 			Value:   defConf.ApparmorProfile,
 			EnvVars: []string{"CONTAINER_APPARMOR_PROFILE"},
+		},
+		&cli.StringFlag{
+			Name:    "blockio-config-file",
+			Usage:   "Path to the blockio class configuration file for configuring the cgroup blockio controller.",
+			Value:   defConf.BlockIOConfigFile,
 		},
 		&cli.StringFlag{
 			Name:  "irqbalance-config-file",

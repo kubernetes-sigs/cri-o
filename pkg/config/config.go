@@ -112,6 +112,11 @@ const (
 )
 
 const (
+	// DefaultBlockIOConfigFile is the default value for blockio controller configuration file
+	DefaultBlockIOConfigFile = ""
+)
+
+const (
 	// DefaultIrqBalanceConfigFile default irqbalance service configuration file path
 	DefaultIrqBalanceConfigFile = "/etc/sysconfig/irqbalance"
 )
@@ -254,6 +259,10 @@ type RuntimeConfig struct {
 	// ApparmorProfile is the apparmor profile name which is used as the
 	// default for the runtime.
 	ApparmorProfile string `toml:"apparmor_profile"`
+
+	// BlockIOConfigFile is the path to the blockio class configuration
+	// file for configuring the cgroup blockio controller.
+	BlockIOConfigFile string `toml:"blockio_config_file"`
 
 	// IrqBalanceConfigFile is the irqbalance service config file which is used
 	// for configuring irqbalance daemon.
@@ -650,6 +659,7 @@ func DefaultConfig() (*Config, error) {
 			ConmonCgroup:             "system.slice",
 			SELinux:                  selinuxEnabled(),
 			ApparmorProfile:          apparmor.DefaultProfile,
+			BlockIOConfigFile:        DefaultBlockIOConfigFile,
 			IrqBalanceConfigFile:     DefaultIrqBalanceConfigFile,
 			CgroupManagerName:        cgroupManager.Name(),
 			PidsLimit:                DefaultPidsLimit,
