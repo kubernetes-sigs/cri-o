@@ -485,7 +485,7 @@ func (s *Server) runPodSandbox(ctx context.Context, req *types.RunPodSandboxRequ
 			}
 			shmSize = quantity.Value()
 		}
-		shmPath, err = setupShm(podContainer.RunDir, mountLabel, shmSize)
+		shmPath, err = sbox.SetupShm(podContainer.RunDir, mountLabel, shmSize)
 		if err != nil {
 			return nil, err
 		}
@@ -933,23 +933,6 @@ func (s *Server) runPodSandbox(ctx context.Context, req *types.RunPodSandboxRequ
 	log.Infof(ctx, "Ran pod sandbox %s with infra container: %s", container.ID(), container.Description())
 	resp = &types.RunPodSandboxResponse{PodSandboxID: sbox.ID()}
 	return resp, nil
-}
-
-func setupShm(podSandboxRunDir, mountLabel string, shmSize int64) (shmPath string, _ error) {
-	if shmSize <= 0 {
-		return "", fmt.Errorf("shm size %d must be greater than 0", shmSize)
-	}
-
-	shmPath = filepath.Join(podSandboxRunDir, "shm")
-	if err := os.Mkdir(shmPath, 0o700); err != nil {
-		return "", err
-	}
-	shmOptions := "mode=1777,size=" + strconv.FormatInt(shmSize, 10)
-	if err := unix.Mount("shm", shmPath, "tmpfs", unix.MS_NOEXEC|unix.MS_NOSUID|unix.MS_NODEV,
-		label.FormatMountLabel(shmOptions, mountLabel)); err != nil {
-		return "", fmt.Errorf("failed to mount shm tmpfs for pod: %v", err)
-	}
-	return shmPath, nil
 }
 
 func (s *Server) configureGeneratorForSysctls(ctx context.Context, g *generate.Generator, hostNetwork, hostIPC bool, sysctls map[string]string) map[string]string {

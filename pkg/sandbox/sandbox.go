@@ -37,6 +37,9 @@ type Sandbox interface {
 	// Must be called after InitInfraContainer
 	Spec() *generate.Generator
 
+	// SetupShim mounts a path to pod sandbox's shared memory
+	SetupShm(string, string, int64) (string, error)
+
 	// ResolvPath returns the sandbox's resolvPath
 	ResolvPath() string
 }
