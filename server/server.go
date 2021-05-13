@@ -153,7 +153,12 @@ func (s *Server) getPortForward(req *pb.PortForwardRequest) (*pb.PortForwardResp
 	return s.stream.streamServer.GetPortForward(req)
 }
 
-func (s *Server) restore(ctx context.Context) {
+// restore attempts to restore the sandboxes and containers.
+// For every sandbox it fails to restore, it starts a cleanup routine attempting to call CNI DEL
+// For every container it fails to restore, it returns that containers image, so that
+// it can be cleaned up (if we're using internal_wipe).
+func (s *Server) restore(ctx context.Context) []string {
+	containersAndTheirImages := map[string]string{}
 	containers, err := s.Store().Containers()
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		logrus.Warnf("could not read containers and sandboxes: %v", err)
@@ -177,6 +182,7 @@ func (s *Server) restore(ctx context.Context) {
 			pods[containers[i].ID] = &metadata
 		} else {
 			podContainers[containers[i].ID] = &metadata
+			containersAndTheirImages[containers[i].ID] = containers[i].ImageID
 		}
 	}
 
@@ -222,39 +228,64 @@ func (s *Server) restore(ctx context.Context) {
 	// Go through all the containers and check if it can be restored. If an error occurs, delete the conainer and
 	// release the name associated with you.
 	for containerID := range podContainers {
-		if err := s.LoadContainer(containerID); err != nil {
-			// containers of other runtimes should not be deleted
-			if err == lib.ErrIsNonCrioContainer {
-				logrus.Infof("ignoring non CRI-O container %s", containerID)
-			} else {
-				logrus.Warnf("could not restore container %s: %v", containerID, err)
-				for _, n := range names[containerID] {
-					if err := s.Store().DeleteContainer(n); err != nil {
-						logrus.Warnf("unable to delete container %s: %v", n, err)
-					}
-					// Release the container name
-					s.ReleaseContainerName(n)
-				}
+		err := s.LoadContainer(containerID)
+		if err == nil || err == lib.ErrIsNonCrioContainer {
+			delete(containersAndTheirImages, containerID)
+			continue
+		}
+		logrus.Warnf("Could not restore container %s: %v", containerID, err)
+		for _, n := range names[containerID] {
+			if err := s.Store().DeleteContainer(n); err != nil {
+				logrus.Warnf("Unable to delete container %s: %v", n, err)
 			}
+			// Release the container name
+			s.ReleaseContainerName(n)
 		}
 	}
 
-	// Restore sandbox IPs
+	// Cleanup the deletedPods in the networking plugin
+	wipeResourceCleaner := resourcestore.NewResourceCleaner()
 	for _, sb := range deletedPods {
+		sb := sb
+		cleanupFunc := func() error {
+			err := s.networkStop(context.Background(), sb)
+			if err == nil {
+				logrus.Infof("Successfully cleaned up network for pod %s", sb.ID())
+			}
+			return err
+		}
 		// Clean up networking if pod couldn't be restored and was deleted
-		logrus.Infof("Deleting pod %s", sb.ID())
-		if err := s.networkStop(ctx, sb); err != nil {
-			logrus.Warnf("Error stopping network on restore cleanup %v:", err)
+		if err := cleanupFunc(); err != nil {
+			logrus.Warnf("Error stopping network on restore cleanup (will retry) %v:", err)
+			wipeResourceCleaner.Add(ctx, "cleanup sandbox network", cleanupFunc)
 		}
 	}
+
+	// If any failed to be deleted, the networking plugin is likely not ready.
+	// The cleanup should be retried until it succeeds.
+	go func() {
+		if err := wipeResourceCleaner.Cleanup(); err != nil {
+			logrus.Errorf("Cleanup during server startup failed: %v", err)
+		}
+	}()
+
+	// Restore sandbox IPs
 	for _, sb := range s.ListSandboxes() {
 		ips, err := s.getSandboxIPs(sb)
 		if err != nil {
-			logrus.Warnf("could not restore sandbox IP for %v: %v", sb.ID(), err)
+			logrus.Warnf("Could not restore sandbox IP for %v: %v", sb.ID(), err)
 			continue
 		}
 		sb.AddIPs(ips)
 	}
+
+	// Return a slice of images to remove, if internal_wipe is set.
+	imagesOfDeletedContainers := []string{}
+	for _, image := range containersAndTheirImages {
+		imagesOfDeletedContainers = append(imagesOfDeletedContainers, image)
+	}
+
+	return imagesOfDeletedContainers
 }
 
 // cleanupSandboxesOnShutdown Remove all running Sandboxes on system shutdown
@@ -369,10 +400,9 @@ func New(
 		return nil, err
 	}
 
-	s.restore(ctx)
+	deletedImages := s.restore(ctx)
 	s.cleanupSandboxesOnShutdown(ctx)
-
-	s.wipeIfAppropriate(ctx)
+	s.wipeIfAppropriate(ctx, deletedImages)
 
 	var bindAddressStr string
 	bindAddress := net.ParseIP(config.StreamAddress)
@@ -442,57 +472,24 @@ func New(
 	return s, nil
 }
 
-func (s *Server) wipeIfAppropriate(ctx context.Context) {
+// wipeIfAppropriate takes a list of images. If the config's VersionFilePersist
+// indicates an upgrade has happened, it attempts to wipe that list of images.
+// This attempt is best-effort.
+func (s *Server) wipeIfAppropriate(ctx context.Context, imagesToDelete []string) {
 	if !s.config.InternalWipe {
 		return
 	}
-	// First, check if the node was rebooted.
-	// We know this happened because the VersionFile (which lives in a tmpfs)
-	// will not be there.
-	shouldWipeContainers, err := version.ShouldCrioWipe(s.config.VersionFile)
-	if err != nil {
-		logrus.Warnf("error encountered when checking whether cri-o should wipe containers: %v", err)
-	}
-
-	// there are two locations we check before wiping:
-	// one in a temporary directory. This is to check whether the node has rebooted.
-	// if so, we should remove containers
-	// another is needed in a persistent directory. This is to check whether we've upgraded
-	// if we've upgraded, we should wipe images
+	// Check if our persistent version file is out of date.
+	// If so, we have upgrade, and we should wipe images.
 	shouldWipeImages, err := version.ShouldCrioWipe(s.config.VersionFilePersist)
 	if err != nil {
 		logrus.Warnf("error encountered when checking whether cri-o should wipe images: %v", err)
 	}
-
-	shouldWipeContainers = shouldWipeContainers || shouldWipeImages
-
-	// First, save the images we should be wiping
-	// We won't remember if we wipe all the containers first
-	var imagesToWipe []string
+	// Note: some of these will fail if some aspect of the pod cleanup failed as well,
+	// but this is best-effort anyway, as the Kubelet will eventually cleanup images when
+	// disk usage gets too high.
 	if shouldWipeImages {
-		containers, err := s.ContainerServer.ListContainers()
-		if err != nil {
-			logrus.Warnf("Failed to list containers: %v", err)
-		}
-		for _, c := range containers {
-			imagesToWipe = append(imagesToWipe, c.ImageRef())
-		}
-	}
-
-	if shouldWipeContainers {
-		for _, sb := range s.ContainerServer.ListSandboxes() {
-			err := s.stopPodSandbox(ctx, sb)
-			if err == nil {
-				err = s.removePodSandbox(ctx, sb)
-			}
-			if err != nil {
-				logrus.Warnf("Failed to cleanup pod %s: %v", sb.ID(), err)
-			}
-		}
-	}
-
-	if shouldWipeImages {
-		for _, img := range imagesToWipe {
+		for _, img := range imagesToDelete {
 			if err := s.removeImage(ctx, img); err != nil {
 				logrus.Warnf("failed to remove image %s: %v", img, err)
 			}
