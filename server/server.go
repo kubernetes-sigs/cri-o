@@ -161,7 +161,7 @@ func (s *Server) restore(ctx context.Context) {
 	pods := map[string]*storage.RuntimeContainerMetadata{}
 	podContainers := map[string]*storage.RuntimeContainerMetadata{}
 	names := map[string][]string{}
-	deletedPods := map[string]bool{}
+	deletedPods := map[string]*sandbox.Sandbox{}
 	for i := range containers {
 		metadata, err2 := s.StorageRuntimeServer().GetContainerMetadata(containers[i].ID)
 		if err2 != nil {
@@ -183,7 +183,8 @@ func (s *Server) restore(ctx context.Context) {
 	// Go through all the pods and check if it can be restored. If an error occurs, delete the pod and any containers
 	// associated with it. Release the pod and container names as well.
 	for sbID, metadata := range pods {
-		if err = s.LoadSandbox(sbID); err == nil {
+		sb, err := s.LoadSandbox(sbID)
+		if err == nil {
 			continue
 		}
 		logrus.Warnf("could not restore sandbox %s container %s: %v", metadata.PodID, sbID, err)
@@ -211,8 +212,11 @@ func (s *Server) restore(ctx context.Context) {
 				}
 			}
 		}
-		// Add the pod id to the list of deletedPods so we don't try to restore IPs for it later on
-		deletedPods[sbID] = true
+		// Add the pod id to the list of deletedPods, to be able to call CNI DEL on the sandbox network.
+		// Unfortunately, if we weren't able to restore a sandbox, then there's little that can be done
+		if sb != nil {
+			deletedPods[sbID] = sb
+		}
 	}
 
 	// Go through all the containers and check if it can be restored. If an error occurs, delete the conainer and
@@ -236,14 +240,14 @@ func (s *Server) restore(ctx context.Context) {
 	}
 
 	// Restore sandbox IPs
-	for _, sb := range s.ListSandboxes() {
+	for _, sb := range deletedPods {
 		// Clean up networking if pod couldn't be restored and was deleted
-		if ok := deletedPods[sb.ID()]; ok {
-			if err := s.networkStop(ctx, sb); err != nil {
-				logrus.Warnf("error stopping network on restore cleanup %v:", err)
-			}
-			continue
+		logrus.Infof("Deleting pod %s", sb.ID())
+		if err := s.networkStop(ctx, sb); err != nil {
+			logrus.Warnf("Error stopping network on restore cleanup %v:", err)
 		}
+	}
+	for _, sb := range s.ListSandboxes() {
 		ips, err := s.getSandboxIPs(sb)
 		if err != nil {
 			logrus.Warnf("could not restore sandbox IP for %v: %v", sb.ID(), err)
