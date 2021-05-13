@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/types"
+	storageTypes "github.com/containers/storage"
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/cri-o/cri-o/internal/hostport"
 	"github.com/cri-o/cri-o/internal/lib"
@@ -195,7 +196,7 @@ func (s *Server) restore(ctx context.Context) []string {
 		}
 		logrus.Warnf("could not restore sandbox %s container %s: %v", metadata.PodID, sbID, err)
 		for _, n := range names[sbID] {
-			if err := s.Store().DeleteContainer(n); err != nil {
+			if err := s.Store().DeleteContainer(n); err != nil && err != storageTypes.ErrNotAContainer {
 				logrus.Warnf("unable to delete container %s: %v", n, err)
 			}
 			// Release the infra container name and the pod name for future use
@@ -210,7 +211,7 @@ func (s *Server) restore(ctx context.Context) []string {
 		for k, v := range podContainers {
 			if v.PodID == sbID {
 				for _, n := range names[k] {
-					if err := s.Store().DeleteContainer(n); err != nil {
+					if err := s.Store().DeleteContainer(n); err != nil && err != storageTypes.ErrNotAContainer {
 						logrus.Warnf("unable to delete container %s: %v", n, err)
 					}
 					// Release the container name for future use
@@ -235,7 +236,7 @@ func (s *Server) restore(ctx context.Context) []string {
 		}
 		logrus.Warnf("Could not restore container %s: %v", containerID, err)
 		for _, n := range names[containerID] {
-			if err := s.Store().DeleteContainer(n); err != nil {
+			if err := s.Store().DeleteContainer(n); err != nil && err != storageTypes.ErrNotAContainer {
 				logrus.Warnf("Unable to delete container %s: %v", n, err)
 			}
 			// Release the container name
