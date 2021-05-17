@@ -94,7 +94,9 @@ func zshCompletion(c *cli.Context) error {
 			continue
 		}
 		for _, name := range command.Names() {
-			subcommands = append(subcommands, name+":"+command.Usage)
+			escapedUsage := strings.ReplaceAll(command.Usage, "'", "'\"'\"'")
+			escapedUsage = strings.ReplaceAll(escapedUsage, "\n", " ")
+			subcommands = append(subcommands, name+":"+escapedUsage)
 		}
 	}
 
@@ -106,8 +108,8 @@ func zshCompletion(c *cli.Context) error {
 
 	fmt.Fprintln(c.App.Writer,
 		fmt.Sprintf(zshCompletionTemplate,
-			strings.Join(subcommands, "' '"),
-			strings.Join(opts, "' '"),
+			strings.Join(subcommands, "'\n        '"),
+			strings.Join(opts, "'\n        '"),
 			c.App.Name))
 	return nil
 }
