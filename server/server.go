@@ -257,11 +257,7 @@ func (s *Server) restore(ctx context.Context) []string {
 			}
 			return err
 		}
-		// Clean up networking if pod couldn't be restored and was deleted
-		if err := cleanupFunc(); err != nil {
-			logrus.Warnf("Error stopping network on restore cleanup (will retry) %v:", err)
-			wipeResourceCleaner.Add(ctx, "cleanup sandbox network", cleanupFunc)
-		}
+		wipeResourceCleaner.Add(ctx, "cleanup sandbox network", cleanupFunc)
 	}
 
 	// If any failed to be deleted, the networking plugin is likely not ready.
