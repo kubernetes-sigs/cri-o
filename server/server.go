@@ -189,12 +189,12 @@ func (s *Server) restore(ctx context.Context) []string {
 
 	// Go through all the pods and check if it can be restored. If an error occurs, delete the pod and any containers
 	// associated with it. Release the pod and container names as well.
-	for sbID, metadata := range pods {
+	for sbID := range pods {
 		sb, err := s.LoadSandbox(sbID)
 		if err == nil {
 			continue
 		}
-		logrus.Warnf("could not restore sandbox %s container %s: %v", metadata.PodID, sbID, err)
+		logrus.Warnf("could not restore sandbox %s; deleting it and containers underneath it: %v", sbID, err)
 		for _, n := range names[sbID] {
 			if err := s.Store().DeleteContainer(n); err != nil && err != storageTypes.ErrNotAContainer {
 				logrus.Warnf("unable to delete container %s: %v", n, err)
@@ -206,18 +206,20 @@ func (s *Server) restore(ctx context.Context) []string {
 				s.ReleasePodName(n)
 			}
 		}
-		// Go through the containers and delete any container that was under the deleted pod
-		logrus.Warnf("deleting all containers under sandbox %s since it could not be restored", sbID)
 		for k, v := range podContainers {
-			if v.PodID == sbID {
-				for _, n := range names[k] {
-					if err := s.Store().DeleteContainer(n); err != nil && err != storageTypes.ErrNotAContainer {
-						logrus.Warnf("unable to delete container %s: %v", n, err)
-					}
-					// Release the container name for future use
-					s.ReleaseContainerName(n)
-				}
+			if v.PodID != sbID {
+				continue
 			}
+			for _, n := range names[k] {
+				if err := s.Store().DeleteContainer(n); err != nil && err != storageTypes.ErrNotAContainer {
+					logrus.Warnf("unable to delete container %s: %v", n, err)
+				}
+				// Release the container name for future use
+				s.ReleaseContainerName(n)
+			}
+			// Remove the container from the list of podContainers, or else we'll retry the delete later,
+			// causing a useless debug message.
+			delete(podContainers, k)
 		}
 		// Add the pod id to the list of deletedPods, to be able to call CNI DEL on the sandbox network.
 		// Unfortunately, if we weren't able to restore a sandbox, then there's little that can be done
