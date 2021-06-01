@@ -880,8 +880,14 @@ gid_mappings = "{{ .GIDMappings }}"
 `
 
 const templateStringCrioRuntimeCtrStopTimeout = `# The minimal amount of time in seconds to wait before issuing a timeout
-# regarding the proper termination of the container. The lowest possible
-# value is 30s, whereas lower values are not considered by CRI-O.
+# regarding the proper termination of the container.
+# This timeout will be applied two times:
+# - If the container gets signalled with its termination signal, then it waits
+#   the specified time until forcing the process to shutdown via SIGKILL
+# - If the container state gets written to disk
+#
+# The lowest possible value is 30s, whereas lower values are not considered
+# by CRI-O.
 ctr_stop_timeout = {{ .CtrStopTimeout }}
 
 `

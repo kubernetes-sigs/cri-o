@@ -295,26 +295,25 @@ func (s *Server) restore(ctx context.Context) []string {
 	return imagesOfDeletedContainers
 }
 
-// cleanupSandboxesOnShutdown Remove all running Sandboxes on system shutdown
-func (s *Server) cleanupSandboxesOnShutdown(ctx context.Context) {
-	_, err := os.Stat(shutdownFile)
-	if err == nil || !os.IsNotExist(err) {
+// stopSandboxesIfShutdownFileExists stops all running Sandboxes on system
+// shutdown if the shutdownFile is present.
+func (s *Server) stopSandboxesIfShutdownFileExists(ctx context.Context) {
+	if _, err := os.Stat(shutdownFile); err == nil || !os.IsNotExist(err) {
 		log.Debugf(ctx, "shutting down all sandboxes, on shutdown")
+
 		s.stopAllPodSandboxes(ctx)
-		err = os.Remove(shutdownFile)
-		if err != nil {
-			log.Warnf(ctx, "Failed to remove %q", shutdownFile)
+
+		if err := os.Remove(shutdownFile); err != nil {
+			log.Warnf(ctx,
+				"Failed to remove shutdown file %q: %v", shutdownFile, err,
+			)
 		}
 	}
 }
 
 // Shutdown attempts to shut down the server's storage cleanly
 func (s *Server) Shutdown(ctx context.Context) error {
-	// why do this on clean shutdown! we want containers left running when crio
-	// is down for whatever reason no?!
-	// notice this won't trigger just on system halt but also on normal
-	// crio.service restart!!!
-	s.cleanupSandboxesOnShutdown(ctx)
+	s.stopSandboxesIfShutdownFileExists(ctx)
 	s.resourceStore.Close()
 
 	if err := s.ContainerServer.Shutdown(); err != nil {
@@ -455,7 +454,7 @@ func New(
 	}
 
 	deletedImages := s.restore(ctx)
-	s.cleanupSandboxesOnShutdown(ctx)
+	s.stopSandboxesIfShutdownFileExists(ctx)
 	s.wipeIfAppropriate(ctx, deletedImages)
 
 	var bindAddressStr string

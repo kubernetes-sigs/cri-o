@@ -34,9 +34,9 @@ func (s *Server) StopPodSandbox(ctx context.Context, req *types.StopPodSandboxRe
 	return s.stopPodSandbox(ctx, sb)
 }
 
-// stopAllPodSandboxes removes all pod sandboxes
+// stopAllPodSandboxes stops all pod sandboxes
 func (s *Server) stopAllPodSandboxes(ctx context.Context) {
-	log.Debugf(ctx, "stopAllPodSandboxes")
+	log.Debugf(ctx, "Stopping all pod sandboxes")
 	for _, sb := range s.ContainerServer.ListSandboxes() {
 		if err := s.stopPodSandbox(ctx, sb); err != nil {
 			log.Warnf(ctx, "could not StopPodSandbox %s: %v", sb.ID(), err)
