@@ -354,6 +354,10 @@ func (r *runtimeService) DeleteContainer(idOrName string) error {
 		return ErrInvalidContainerID
 	}
 	container, err := r.storageImageServer.GetStore().Container(idOrName)
+	// Already deleted
+	if errors.Is(err, storage.ErrContainerUnknown) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
