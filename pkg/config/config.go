@@ -45,7 +45,7 @@ const (
 	defaultRuntime             = "runc"
 	DefaultRuntimeType         = "oci"
 	DefaultRuntimeRoot         = "/run/runc"
-	defaultGRPCMaxMsgSize      = 16 * 1024 * 1024
+	defaultGRPCMaxMsgSize      = 80 * 1024 * 1024
 	OCIBufSize                 = 8192
 	RuntimeTypeVM              = "vm"
 	defaultCtrStopTimeout      = 30 // seconds
