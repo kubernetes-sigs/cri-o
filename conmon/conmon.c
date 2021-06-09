@@ -1761,8 +1761,13 @@ int main(int argc, char *argv[])
 	int exit_status = -1;
 	const char *exit_message = NULL;
 
-	if (timed_out) {
-		if (container_pid > 0)
+	if (timed_out && container_pid > 0) {
+		pid_t process_group = getpgid(container_pid);
+		/* if process_group is 1, we will end up calling
+		 *  kill(-1), which kills everything conmon is allowed to. */
+		if (process_group > 1)
+			kill(-process_group, SIGKILL);
+		else
 			kill(container_pid, SIGKILL);
 		exit_message = "command timed out";
 	} else {
