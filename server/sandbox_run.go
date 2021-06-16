@@ -15,6 +15,7 @@ import (
 
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/idtools"
+	"github.com/cri-o/cri-o/lib/node"
 	"github.com/cri-o/cri-o/lib/sandbox"
 	"github.com/cri-o/cri-o/oci"
 	"github.com/cri-o/cri-o/pkg/annotations"
@@ -554,6 +555,9 @@ func (s *Server) RunPodSandbox(ctx context.Context, req *pb.RunPodSandboxRequest
 			}
 			g.SetLinuxCgroupsPath(cgPath + ":" + "crio" + ":" + id)
 			cgroupParent = cgPath
+			if node.SystemdHasCollectMode() {
+				g.AddAnnotation("org.systemd.property.CollectMode", "'inactive-or-failed'")
+			}
 		} else {
 			if strings.HasSuffix(path.Base(cgroupParent), ".slice") {
 				return nil, fmt.Errorf("cri-o configured with cgroupfs cgroup manager, but received systemd slice as parent: %s", cgroupParent)

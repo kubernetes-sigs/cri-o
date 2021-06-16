@@ -16,6 +16,7 @@ import (
 
 	"github.com/containers/libpod/pkg/secrets"
 	"github.com/cri-o/cri-o/lib"
+	"github.com/cri-o/cri-o/lib/node"
 	"github.com/cri-o/cri-o/lib/sandbox"
 	"github.com/cri-o/cri-o/oci"
 	"github.com/cri-o/cri-o/pkg/annotations"
@@ -1083,6 +1084,9 @@ func (s *Server) createSandboxContainer(ctx context.Context, containerID string,
 		useSystemd := s.config.CgroupManager == oci.SystemdCgroupsManager
 		if useSystemd {
 			parent = defaultSystemdParent
+			if node.SystemdHasCollectMode() {
+				specgen.AddAnnotation("org.systemd.property.CollectMode", "'inactive-or-failed'")
+			}
 		}
 		if sb.CgroupParent() != "" {
 			parent = sb.CgroupParent()

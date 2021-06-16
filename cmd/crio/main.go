@@ -17,6 +17,7 @@ import (
 
 	"github.com/containers/storage/pkg/reexec"
 	"github.com/cri-o/cri-o/lib"
+	"github.com/cri-o/cri-o/lib/node"
 	"github.com/cri-o/cri-o/oci"
 	"github.com/cri-o/cri-o/pkg/signals"
 	"github.com/cri-o/cri-o/server"
@@ -437,6 +438,10 @@ func main() {
 		}
 
 		if err := validateConfig(config); err != nil {
+			return err
+		}
+
+		if err := node.ValidateConfig(); err != nil {
 			return err
 		}
 

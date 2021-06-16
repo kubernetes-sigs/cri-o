@@ -7,20 +7,33 @@
     version: "{{ cri_tools_git_version }}"
     force: "{{ force_clone | default(False) | bool}}"
 
-- name: install crictl
-  command: "/usr/bin/go install github.com/kubernetes-sigs/cri-tools/cmd/crictl"
+- name: find instances of old repo
+  shell: grep -rl 'gcr.io/cri-tools' --exclude-dir .git --exclude-dir _output "{{ ansible_env.GOPATH }}/src/github.com/kubernetes-sigs/cri-tools"
+  ignore_errors: yes
+  register: to_replace
 
-- name: install critest
-  command: "/usr/bin/go test -c github.com/kubernetes-sigs/cri-tools/cmd/critest -o {{ ansible_env.GOPATH }}/bin/critest"
+- name: replace instances of old repo
+  replace:
+    path: "{{ item }}"
+    regexp: "gcr.io/cri-tools"
+    replace: "gcr.io/k8s-staging-cri-tools"
+  with_items: "{{ to_replace.stdout_lines }}"
 
-- name: link crictl
+- name: replace old manifest
+  replace:
+    path: "{{ ansible_env.GOPATH }}/src/github.com/kubernetes-sigs/cri-tools/pkg/validate/image.go"
+    regexp: "9179135b4b4cc5a8721e09379244807553c318d92fa3111a65133241551ca343"
+    replace: "9700f9a2f5bf2c45f2f605a0bd3bce7cf37420ec9d3ed50ac2758413308766bf"
+
+- name: build cri-tools
+  make:
+    chdir: "{{ ansible_env.GOPATH }}/src/github.com/kubernetes-sigs/cri-tools"
+
+- name: link crictl and critest
   file:
-    src: "{{ ansible_env.GOPATH }}/bin/crictl"
-    dest: /usr/bin/crictl
+    src: "{{ ansible_env.GOPATH }}/bin/{{ item }}"
+    dest: "/usr/bin/{{ item }}"
     state: link
-
-- name: link critest
-  file:
-    src: "{{ ansible_env.GOPATH }}/bin/critest"
-    dest: /usr/bin/critest
-    state: link
+  with_items:
+    - "critest"
+    - "crictl"
