@@ -29,6 +29,9 @@ import (
 	pb "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+// sync with https://github.com/containers/storage/blob/7fe03f6c765f2adbc75a5691a1fb4f19e56e7071/pkg/truncindex/truncindex.go#L92
+const noSuchID = "no such id"
+
 type orderedMounts []rspec.Mount
 
 // Len returns the number of mounts. Used in sorting.
@@ -548,7 +551,11 @@ func (s *Server) CreateContainer(ctx context.Context, req *pb.CreateContainerReq
 		log.Infof(ctx, description)
 		err := s.CtrIDIndex().Delete(ctr.ID())
 		if err != nil {
-			log.Warnf(ctx, "couldn't delete ctr id %s from idIndex", ctr.ID())
+			// already deleted
+			if strings.Contains(err.Error(), noSuchID) {
+				return nil
+			}
+			log.Warnf(ctx, "Couldn't delete ctr id %s from idIndex", ctr.ID())
 		}
 		return err
 	})
