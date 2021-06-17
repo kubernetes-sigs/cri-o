@@ -208,6 +208,28 @@ func (c *ContainerServer) LoadSandbox(id string) (sb *sandbox.Sandbox, retErr er
 	sb.SetSeccompProfilePath(spp)
 	sb.SetNamespaceOptions(&nsOpts)
 
+	// We add an NS only if we can load a permanent one.
+	// Otherwise, the sandbox will live in the host namespace.
+	if c.config.ManageNSLifecycle {
+		namespacesToJoin := []struct {
+			rspecNS  rspec.LinuxNamespaceType
+			joinFunc func(string) error
+		}{
+			{rspecNS: rspec.NetworkNamespace, joinFunc: sb.NetNsJoin},
+			{rspecNS: rspec.IPCNamespace, joinFunc: sb.IpcNsJoin},
+			{rspecNS: rspec.UTSNamespace, joinFunc: sb.UtsNsJoin},
+			{rspecNS: rspec.UserNamespace, joinFunc: sb.UserNsJoin},
+		}
+		for _, namespaceToJoin := range namespacesToJoin {
+			path, err := configNsPath(&m, namespaceToJoin.rspecNS)
+			if err == nil {
+				if nsErr := namespaceToJoin.joinFunc(path); nsErr != nil {
+					return sb, nsErr
+				}
+			}
+		}
+	}
+
 	if err := c.AddSandbox(sb); err != nil {
 		return sb, err
 	}
@@ -284,28 +306,6 @@ func (c *ContainerServer) LoadSandbox(id string) (sb *sandbox.Sandbox, retErr er
 
 	if err := sb.SetInfraContainer(scontainer); err != nil {
 		return sb, err
-	}
-
-	// We add an NS only if we can load a permanent one.
-	// Otherwise, the sandbox will live in the host namespace.
-	if c.config.ManageNSLifecycle || wasSpoofed {
-		namespacesToJoin := []struct {
-			rspecNS  rspec.LinuxNamespaceType
-			joinFunc func(string) error
-		}{
-			{rspecNS: rspec.NetworkNamespace, joinFunc: sb.NetNsJoin},
-			{rspecNS: rspec.IPCNamespace, joinFunc: sb.IpcNsJoin},
-			{rspecNS: rspec.UTSNamespace, joinFunc: sb.UtsNsJoin},
-			{rspecNS: rspec.UserNamespace, joinFunc: sb.UserNsJoin},
-		}
-		for _, namespaceToJoin := range namespacesToJoin {
-			path, err := configNsPath(&m, namespaceToJoin.rspecNS)
-			if err == nil {
-				if nsErr := namespaceToJoin.joinFunc(path); err != nil {
-					return sb, nsErr
-				}
-			}
-		}
 	}
 
 	sb.SetCreated()
