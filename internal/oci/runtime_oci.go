@@ -412,17 +412,6 @@ func (r *runtimeOCI) constructExecCommand(ctx context.Context, c *Container, pro
 	return execCmd
 }
 
-func createPidFile() (string, error) {
-	pidFile, err := ioutil.TempFile("", "pidfile")
-	if err != nil {
-		return "", err
-	}
-	pidFile.Close()
-	pidFileName := pidFile.Name()
-
-	return pidFileName, nil
-}
-
 func killContainerExecProcess(ctx context.Context, pidFile string, cmd *exec.Cmd) {
 	// Attempt to get the container PID and PGID from the file the runtime should have written.
 	ctrPid, ctrPgid, err := pidAndpgidFromFile(pidFile)
