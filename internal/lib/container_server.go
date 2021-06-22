@@ -210,22 +210,20 @@ func (c *ContainerServer) LoadSandbox(id string) (sb *sandbox.Sandbox, retErr er
 
 	// We add an NS only if we can load a permanent one.
 	// Otherwise, the sandbox will live in the host namespace.
-	if c.config.ManageNSLifecycle {
-		namespacesToJoin := []struct {
-			rspecNS  rspec.LinuxNamespaceType
-			joinFunc func(string) error
-		}{
-			{rspecNS: rspec.NetworkNamespace, joinFunc: sb.NetNsJoin},
-			{rspecNS: rspec.IPCNamespace, joinFunc: sb.IpcNsJoin},
-			{rspecNS: rspec.UTSNamespace, joinFunc: sb.UtsNsJoin},
-			{rspecNS: rspec.UserNamespace, joinFunc: sb.UserNsJoin},
-		}
-		for _, namespaceToJoin := range namespacesToJoin {
-			path, err := configNsPath(&m, namespaceToJoin.rspecNS)
-			if err == nil {
-				if nsErr := namespaceToJoin.joinFunc(path); nsErr != nil {
-					return sb, nsErr
-				}
+	namespacesToJoin := []struct {
+		rspecNS  rspec.LinuxNamespaceType
+		joinFunc func(string) error
+	}{
+		{rspecNS: rspec.NetworkNamespace, joinFunc: sb.NetNsJoin},
+		{rspecNS: rspec.IPCNamespace, joinFunc: sb.IpcNsJoin},
+		{rspecNS: rspec.UTSNamespace, joinFunc: sb.UtsNsJoin},
+		{rspecNS: rspec.UserNamespace, joinFunc: sb.UserNsJoin},
+	}
+	for _, namespaceToJoin := range namespacesToJoin {
+		path, err := configNsPath(&m, namespaceToJoin.rspecNS)
+		if err == nil {
+			if nsErr := namespaceToJoin.joinFunc(path); nsErr != nil {
+				return sb, nsErr
 			}
 		}
 	}
