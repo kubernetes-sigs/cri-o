@@ -213,6 +213,7 @@ function start_crio_with_stopped_pod() {
 
 @test "internal_wipe eventually cleans network on forced restart of crio if network is slow to come up" {
 	CNI_RESULTS_DIR=/var/lib/cni/results
+	CNI_TYPE=bridge
 
 	start_crio
 
@@ -228,6 +229,7 @@ function start_crio_with_stopped_pod() {
 	cleanup_namespaces_dir
 
 	# pretend like the CNI plugin is waiting for a container to start
+	ls $CRIO_CNI_PLUGIN >&3
 	mv "$CRIO_CNI_PLUGIN"/"$CNI_TYPE" "$CRIO_CNI_PLUGIN"/"$CNI_TYPE"-hidden
 	rm "$CONTAINER_VERSION_FILE"
 
