@@ -513,6 +513,17 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 		})
 	}
 
+	// add bind mount /etc/mtab to /proc/mounts allow looking for mountfiles there in the container
+	// compatible with Docker
+	if _, err := os.Stat("/proc/mounts"); err == nil {
+		ctr.SpecAddMount(rspec.Mount{
+			Destination: "/etc/mtab",
+			Type:        "bind",
+			Source:      "/proc/mounts",
+			Options:     append(options, []string{"bind", "nodev", "nosuid", "noexec"}...),
+		})
+	}
+
 	if sb.HostnamePath() != "" {
 		if err := securityLabel(sb.HostnamePath(), mountLabel, false); err != nil {
 			return nil, err
