@@ -28,6 +28,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Container is the main public container interface
@@ -136,6 +141,15 @@ func (c *container) SpecAddMount(r rspec.Mount) {
 
 // SpecAddAnnotation adds all annotations to the spec
 func (c *container) SpecAddAnnotations(ctx context.Context, sb *sandbox.Sandbox, containerVolumes []oci.ContainerVolume, mountPoint, configStopSignal string, imageResult *storage.ImageResult, isSystemd, systemdHasCollectMode bool) (err error) {
+	// TODO: this is just for testing
+	ctx = baggage.ContextWithValues(ctx,
+		attribute.String("test-info", "this is test baggage"),
+	)
+	// TODO: Adding to test
+	tracer := otel.GetTracerProvider().Tracer("ctr-spec-add-annot")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "ctr-spec-add-annot")
+	defer span.End()
 	// Copied from k8s.io/kubernetes/pkg/kubelet/kuberuntime/labels.go
 	const podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 

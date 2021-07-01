@@ -43,6 +43,7 @@ const (
 	shutdownFile        = "/var/lib/crio/crio.shutdown"
 	certRefreshInterval = time.Minute * 5
 	rootlessEnvName     = "_CRIO_ROOTLESS"
+	tracerProvider      = "crio"
 )
 
 var errSandboxNotCreated = errors.New("sandbox not created")
@@ -61,6 +62,7 @@ type Server struct {
 	config          libconfig.Config
 	stream          StreamService
 	hostportManager hostport.HostPortManager
+	tracerName      string
 
 	*lib.ContainerServer
 	monitorsChan      chan struct{}
@@ -418,6 +420,13 @@ func New(
 
 	hostportManager := hostport.NewMetaHostportManager()
 
+	// give server a tracer name to tag spans with
+	h, err := os.Hostname()
+	if err != nil {
+		return nil, err
+	}
+	tracerName := fmt.Sprintf("crio-%s", h)
+
 	idMappings, err := getIDMappings(config)
 	if err != nil {
 		return nil, err
@@ -432,6 +441,7 @@ func New(
 	s := &Server{
 		ContainerServer:          containerServer,
 		hostportManager:          hostportManager,
+		tracerName:               tracerName,
 		config:                   *config,
 		monitorsChan:             make(chan struct{}),
 		defaultIDMappings:        idMappings,

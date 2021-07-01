@@ -26,6 +26,10 @@ import (
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
 	"github.com/godbus/dbus/v5"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ExecCmd executes a command with args and returns its output as a string along
@@ -56,6 +60,15 @@ func StatusToExitCode(status int) int {
 // RunUnderSystemdScope adds the specified pid to a systemd scope
 func RunUnderSystemdScope(mgr *dbusmgr.DbusConnManager, pid int, slice, unitName string, properties ...systemdDbus.Property) error {
 	ctx := context.Background()
+	// TODO: Testing tracer with Fn outside kubelet
+	ctx = baggage.ContextWithValues(ctx,
+		attribute.String("PID and unit name", fmt.Sprintf("%s %s", string(pid), unitName)),
+	)
+	tracer := otel.GetTracerProvider().Tracer("run-under-systemd-scope")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "pid-to-systemd-scope")
+	defer span.End()
+
 	var err error
 	// sanity check
 	if mgr == nil {
@@ -77,6 +90,7 @@ func RunUnderSystemdScope(mgr *dbusmgr.DbusConnManager, pid int, slice, unitName
 	}); err != nil {
 		return err
 	}
+	span.AddEvent("started transient unit context", trace.WithAttributes(attribute.String(unitName, "replace")))
 
 	// Block until job is started
 	<-ch

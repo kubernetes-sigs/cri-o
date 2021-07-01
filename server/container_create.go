@@ -25,6 +25,10 @@ import (
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type orderedMounts []rspec.Mount
@@ -409,6 +413,14 @@ func hostNetwork(containerConfig *types.ContainerConfig) bool {
 func (s *Server) CreateContainer(ctx context.Context, req *types.CreateContainerRequest) (res *types.CreateContainerResponse, retErr error) {
 	log.Infof(ctx, "Creating container: %s", translateLabelsToDescription(req.Config.Labels))
 
+	ctx = baggage.ContextWithValues(ctx,
+		attribute.String("create-container-request-id", req.PodSandboxID),
+	)
+	tracer := otel.GetTracerProvider().Tracer(s.tracerName)
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "create-container")
+	defer span.End()
+
 	s.updateLock.RLock()
 	defer s.updateLock.RUnlock()
 	sb, err := s.getPodSandboxFromRequest(req.PodSandboxID)
@@ -418,6 +430,7 @@ func (s *Server) CreateContainer(ctx context.Context, req *types.CreateContainer
 		}
 		return nil, errors.Wrapf(err, "specified sandbox not found: %s", req.PodSandboxID)
 	}
+	span.AddEvent("pod sandbox ID from request", trace.WithAttributes(attribute.String("pod-sandbox", string(req.PodSandboxID))))
 
 	stopMutex := sb.StopMutex()
 	stopMutex.RLock()
@@ -534,6 +547,7 @@ func (s *Server) CreateContainer(ctx context.Context, req *types.CreateContainer
 
 	newContainer.SetCreated()
 
+	span.AddEvent("container created", trace.WithAttributes(attribute.String("container", fmt.Sprintf("id: %s name: %s", newContainer.ID(), newContainer.Name()))))
 	log.Infof(ctx, "Created container %s: %s", newContainer.ID(), newContainer.Description())
 	return &types.CreateContainerResponse{
 		ContainerID: ctr.ID(),

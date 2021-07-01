@@ -43,7 +43,7 @@ const (
 	defaultRuntime             = "runc"
 	DefaultRuntimeType         = "oci"
 	DefaultRuntimeRoot         = "/run/runc"
-	defaultGRPCMaxMsgSize      = 16 * 1024 * 1024
+	defaultGRPCMaxMsgSize      = 80 * 1024 * 1024
 	OCIBufSize                 = 8192
 	RuntimeTypeVM              = "vm"
 	defaultCtrStopTimeout      = 30 // seconds
@@ -63,6 +63,7 @@ type Config struct {
 	ImageConfig
 	NetworkConfig
 	MetricsConfig
+	OtelConfig
 	SystemContext *types.SystemContext
 }
 
@@ -467,6 +468,23 @@ type MetricsConfig struct {
 	MetricsKey string `toml:"metrics_key"`
 }
 
+// OtelConfig specifies all necessary configuration for opentelemetry
+// trace retrieval
+type OtelConfig struct {
+	// EnableTracing can be used to globally enable or disable tracing support
+	EnableTracing bool `toml:"enable_tracing"`
+
+	// CollectorGRPCPort is the port on which the grpc tracing collector server will listen.
+	CollectorGRPCPort string `toml:"collector_grpc_port"`
+
+	// OtelServiceName is the name for the global grpc tracer provider.
+	OtelServiceName string `toml:"otel_service_name"`
+
+	// TracingExporter is the grpc tracing exporter to configure.
+	// "otlp" and "jaeger" are supported
+	TracingExporter string `toml:"tracing_exporter"`
+}
+
 // tomlConfig is another way of looking at a Config, which is
 // TOML-friendly (it has all of the explicit tables). It's just used for
 // conversions.
@@ -478,6 +496,7 @@ type tomlConfig struct {
 		Image   struct{ ImageConfig }   `toml:"image"`
 		Network struct{ NetworkConfig } `toml:"network"`
 		Metrics struct{ MetricsConfig } `toml:"metrics"`
+		Otel    struct{ OtelConfig }    `toml:"otel"`
 	} `toml:"crio"`
 }
 
@@ -493,6 +512,7 @@ func (t *tomlConfig) toConfig(c *Config) {
 	c.ImageConfig = t.Crio.Image.ImageConfig
 	c.NetworkConfig = t.Crio.Network.NetworkConfig
 	c.MetricsConfig = t.Crio.Metrics.MetricsConfig
+	c.OtelConfig = t.Crio.Otel.OtelConfig
 	t.SetSystemContext(c)
 }
 
@@ -503,6 +523,7 @@ func (t *tomlConfig) fromConfig(c *Config) {
 	t.Crio.Image.ImageConfig = c.ImageConfig
 	t.Crio.Network.NetworkConfig = c.NetworkConfig
 	t.Crio.Metrics.MetricsConfig = c.MetricsConfig
+	t.Crio.Otel.OtelConfig = c.OtelConfig
 }
 
 // UpdateFromFile populates the Config from the TOML-encoded file at the given
@@ -680,6 +701,12 @@ func DefaultConfig() (*Config, error) {
 		},
 		MetricsConfig: MetricsConfig{
 			MetricsPort: 9090,
+		},
+		OtelConfig: OtelConfig{
+			CollectorGRPCPort: "4317",
+			EnableTracing:     true,
+			TracingExporter:   "otlp",
+			OtelServiceName:   "crio",
 		},
 	}, nil
 }
