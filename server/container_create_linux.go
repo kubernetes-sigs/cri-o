@@ -33,6 +33,8 @@ import (
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
+
+	"github.com/intel/goresctrl/pkg/blockio"
 )
 
 // createContainerPlatform performs platform dependent intermediate steps before calling the container's oci.Runtime().CreateContainer()
@@ -303,6 +305,18 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 
 		log.Debugf(ctx, "Applied AppArmor profile %s to container %s", profile, containerID)
 		specgen.SetProcessApparmorProfile(profile)
+	}
+
+	// Get blockio class
+	if s.Config().BlockIO().Enabled() {
+		if blockioClass, err := blockio.ContainerClassFromAnnotations(metadata.Name, containerConfig.Annotations, sb.Annotations()); blockioClass != "" && err == nil {
+			if linuxBlockIO, err := blockio.OciLinuxBlockIO(blockioClass); err == nil {
+				if specgen.Config.Linux.Resources == nil {
+					specgen.Config.Linux.Resources = &rspec.LinuxResources{}
+				}
+				specgen.Config.Linux.Resources.BlockIO = linuxBlockIO
+			}
+		}
 	}
 
 	logPath, err := ctr.LogPath(sb.LogDir())

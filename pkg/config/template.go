@@ -241,6 +241,11 @@ func initCrioTemplateConfig(c *Config) ([]*templateConfigValue, error) {
 			isDefaultValue: simpleEqual(dc.ApparmorProfile, c.ApparmorProfile),
 		},
 		{
+			templateString: templateStringCrioRuntimeBlockIOConfigFile,
+			group:          crioRuntimeConfig,
+			isDefaultValue: simpleEqual(dc.BlockIOConfigFile, c.BlockIOConfigFile),
+		},
+		{
 			templateString: templateStringCrioRuntimeIrqBalanceConfigFile,
 			group:          crioRuntimeConfig,
 			isDefaultValue: simpleEqual(dc.IrqBalanceConfigFile, c.IrqBalanceConfigFile),
@@ -747,6 +752,12 @@ const templateStringCrioRuntimeApparmorProfile = `# Used to change the name of t
 # the profile is set to "unconfined", then this equals to disabling AppArmor.
 # This option supports live configuration reload.
 apparmor_profile = "{{ .ApparmorProfile }}"
+
+`
+
+const templateStringCrioRuntimeBlockIOConfigFile = `# Path to the blockio class configuration file for configuring
+# the cgroup blockio controller.
+blockio_config_file = "{{ .BlockIOConfigFile }}"
 
 `
 

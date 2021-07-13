@@ -17,6 +17,7 @@ h
 --apparmor-profile
 --big-files-temporary-dir
 --bind-mount-prefix
+--blockio-config-file
 --cgroup-manager
 --clean-shutdown-file
 --cni-config-dir

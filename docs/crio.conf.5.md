@@ -137,6 +137,9 @@ the container runtime configuration.
 **apparmor_profile**=""
   Used to change the name of the default AppArmor profile of CRI-O. The default profile name is "crio-default".
 
+**blockio_config_file**=""
+  Path to the blockio class configuration file for configuring the cgroup blockio controller.
+
 **irqbalance_config_file**="/etc/sysconfig/irqbalance"
   Used to change irqbalance service config file which is used by CRI-O.
   For CentOS/SUSE, this file is located at /etc/sysconfig/irqbalance. For Ubuntu, this file is located at /etc/default/irqbalance.
@@ -241,7 +244,7 @@ the container runtime configuration.
 **drop_infra_ctr**=false
   Determines whether we drop the infra container when a pod does not have a private PID namespace, and does not use a kernel separating runtime (like kata).
   Requies **manage_ns_lifecycle** to be true.
-  
+
 **infra_ctr_cpuset**=""
     Determines the CPU set to run infra containers. If not specified, the CRI-O will use all online CPUs to run infra containers.
     You can specify CPUs in the Linux CPU list format.

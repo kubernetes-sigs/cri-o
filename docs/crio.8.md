@@ -16,6 +16,7 @@ crio
 [--apparmor-profile]=[value]
 [--big-files-temporary-dir]=[value]
 [--bind-mount-prefix]=[value]
+[--blockio-config-file]=[value]
 [--cgroup-manager]=[value]
 [--clean-shutdown-file]=[value]
 [--cni-config-dir]=[value]
@@ -130,6 +131,8 @@ crio [GLOBAL OPTIONS] command [COMMAND OPTIONS] [ARGUMENTS...]
 **--big-files-temporary-dir**="": Path to the temporary directory to use for storing big files, used to store image blobs and data streams related to containers image management.
 
 **--bind-mount-prefix**="": A prefix to use for the source of the bind mounts. This option would be useful if you were running CRI-O in a container. And had `/` mounted on `/host` in your container. Then if you ran CRI-O with the `--bind-mount-prefix=/host` option, CRI-O would add /host to any bind mounts it is handed over CRI. If Kubernetes asked to have `/var/lib/foobar` bind mounted into the container, then CRI-O would bind mount `/host/var/lib/foobar`. Since CRI-O itself is running in a container with `/` or the host mounted on `/host`, the container would end up with `/var/lib/foobar` from the host mounted in the container rather then `/var/lib/foobar` from the CRI-O container. (default: "")
+
+**--blockio-config-file**="": Path to the blockio class configuration file for configuring the cgroup blockio controller. (default: "")
 
 **--cgroup-manager**="": cgroup manager (cgroupfs or systemd) (default: systemd)
 
