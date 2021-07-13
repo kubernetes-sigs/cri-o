@@ -81,6 +81,9 @@ func (c *Config) Reload() error {
 	if err := c.ReloadAppArmorProfile(newConfig); err != nil {
 		return err
 	}
+	if err := c.ReloadRdtConfig(newConfig); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -194,6 +197,18 @@ func (c *Config) ReloadAppArmorProfile(newConfig *Config) error {
 		}
 		c.ApparmorProfile = newConfig.ApparmorProfile
 		logConfig("apparmor_profile", c.ApparmorProfile)
+	}
+	return nil
+}
+
+// ReloadRdtConfig reloads the RDT configuration if changed
+func (c *Config) ReloadRdtConfig(newConfig *Config) error {
+	if c.RdtConfigFile != newConfig.RdtConfigFile {
+		if err := c.Rdt().Load(newConfig.RdtConfigFile); err != nil {
+			return errors.Wrap(err, "unable to reload rdt_config_file")
+		}
+		c.RdtConfigFile = newConfig.RdtConfigFile
+		logConfig("rdt_config_file", c.RdtConfigFile)
 	}
 	return nil
 }

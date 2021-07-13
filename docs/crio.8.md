@@ -72,6 +72,7 @@ crio
 [--pinns-path]=[value]
 [--profile-port]=[value]
 [--profile]
+[--rdt-config-file]=[value]
 [--read-only]
 [--registry]=[value]
 [--root|-r]=[value]
@@ -283,6 +284,8 @@ crio [GLOBAL OPTIONS] command [COMMAND OPTIONS] [ARGUMENTS...]
 **--profile**: Enable pprof remote profiler on localhost:6060
 
 **--profile-port**="": Port for the pprof profiler (default: 6060)
+
+**--rdt-config-file**="": Path to the RDT configuration file for configuring the resctrl pseudo-filesystem
 
 **--read-only**: Setup all unprivileged containers to run as read-only. Automatically mounts tmpfs on `/run`, `/tmp` and `/var/tmp`. (default: false)
 

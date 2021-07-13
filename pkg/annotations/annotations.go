@@ -1,5 +1,9 @@
 package annotations
 
+import (
+	"github.com/intel/goresctrl/pkg/rdt"
+)
+
 const (
 	// UsernsMode is the user namespace mode to use
 	UsernsModeAnnotation = "io.kubernetes.cri-o.userns-mode"
@@ -38,4 +42,5 @@ var AllAllowedAnnotations = []string{
 	CPUQuotaAnnotation,
 	IRQLoadBalancingAnnotation,
 	OCISeccompBPFHookAnnotation,
+	rdt.RdtContainerAnnotation,
 }

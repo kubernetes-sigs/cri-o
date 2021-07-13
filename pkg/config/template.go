@@ -246,6 +246,11 @@ func initCrioTemplateConfig(c *Config) ([]*templateConfigValue, error) {
 			isDefaultValue: simpleEqual(dc.IrqBalanceConfigFile, c.IrqBalanceConfigFile),
 		},
 		{
+			templateString: templateStringCrioRuntimeRdtConfigFile,
+			group:          crioRuntimeConfig,
+			isDefaultValue: simpleEqual(dc.RdtConfigFile, c.RdtConfigFile),
+		},
+		{
 			templateString: templateStringCrioRuntimeCgroupManager,
 			group:          crioRuntimeConfig,
 			isDefaultValue: simpleEqual(dc.CgroupManagerName, c.CgroupManagerName),
@@ -756,6 +761,12 @@ irqbalance_config_file = "{{ .IrqBalanceConfigFile }}"
 
 `
 
+const templateStringCrioRuntimeRdtConfigFile = `# Path to the RDT configuration file for configuring the resctrl pseudo-filesystem.
+# This option supports live configuration reload.
+rdt_config_file = "{{ .RdtConfigFile }}"
+
+`
+
 const templateStringCrioRuntimeCgroupManager = `# Cgroup management implementation used for the runtime.
 cgroup_manager = "{{ .CgroupManagerName }}"
 
@@ -963,6 +974,7 @@ const templateStringCrioRuntimeRuntimesRuntimeHandler = `# The "crio.runtime.run
 #   "io.kubernetes.cri-o.ShmSize" for configuring the size of /dev/shm.
 #   "io.kubernetes.cri-o.UnifiedCgroup.$CTR_NAME" for configuring the cgroup v2 unified block for a container.
 #   "io.containers.trace-syscall" for tracing syscalls via the OCI seccomp BPF hook.
+#   "io.kubernetes.cri.rdt-class" for setting the RDT class of a container
 
 {{ range $runtime_name, $runtime_handler := .Runtimes  }}
 [crio.runtime.runtimes.{{ $runtime_name }}]

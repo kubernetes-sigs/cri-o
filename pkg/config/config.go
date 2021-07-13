@@ -25,6 +25,7 @@ import (
 	"github.com/cri-o/cri-o/internal/config/device"
 	"github.com/cri-o/cri-o/internal/config/node"
 	"github.com/cri-o/cri-o/internal/config/nsmgr"
+	"github.com/cri-o/cri-o/internal/config/rdt"
 	"github.com/cri-o/cri-o/internal/config/seccomp"
 	"github.com/cri-o/cri-o/internal/config/ulimits"
 	"github.com/cri-o/cri-o/pkg/annotations"
@@ -261,6 +262,9 @@ type RuntimeConfig struct {
 	// for configuring irqbalance daemon.
 	IrqBalanceConfigFile string `toml:"irqbalance_config_file"`
 
+	// RdtConfigFile is the RDT config file used for configuring resctrl fs
+	RdtConfigFile string `toml:"rdt_config_file"`
+
 	// CgroupManagerName is the manager implementation name which is used to
 	// handle cgroups for containers.
 	CgroupManagerName string `toml:"cgroup_manager"`
@@ -343,6 +347,9 @@ type RuntimeConfig struct {
 
 	// apparmorConfig is the internal AppArmor configuration
 	apparmorConfig *apparmor.Config
+
+	// rdtConfig is the internal Rdt configuration
+	rdtConfig *rdt.Config
 
 	// ulimitConfig is the internal ulimit configuration
 	ulimitsConfig *ulimits.Config
@@ -653,6 +660,7 @@ func DefaultConfig() (*Config, error) {
 			SELinux:                  selinuxEnabled(),
 			ApparmorProfile:          apparmor.DefaultProfile,
 			IrqBalanceConfigFile:     DefaultIrqBalanceConfigFile,
+			RdtConfigFile:            rdt.DefaultRdtConfigFile,
 			CgroupManagerName:        cgroupManager.Name(),
 			PidsLimit:                DefaultPidsLimit,
 			ContainerExitsDir:        containerExitsDir,
@@ -665,6 +673,7 @@ func DefaultConfig() (*Config, error) {
 			NamespacesDir:            defaultNamespacesDir,
 			seccompConfig:            seccomp.New(),
 			apparmorConfig:           apparmor.New(),
+			rdtConfig:                rdt.New(),
 			ulimitsConfig:            ulimits.New(),
 			cgroupManager:            cgroupManager,
 			deviceConfig:             device.New(),
@@ -929,6 +938,11 @@ func (c *RuntimeConfig) Validate(systemContext *types.SystemContext, onExecution
 		if err := c.apparmorConfig.LoadProfile(c.ApparmorProfile); err != nil {
 			return errors.Wrap(err, "unable to load AppArmor profile")
 		}
+
+		if err := c.rdtConfig.Load(c.RdtConfigFile); err != nil {
+			return errors.Wrap(err, "rdt configuration")
+		}
+
 		cgroupManager, err := cgmgr.SetCgroupManager(c.CgroupManagerName)
 		if err != nil {
 			return errors.Wrap(err, "unable to update cgroup manager")
@@ -999,6 +1013,11 @@ func (c *RuntimeConfig) Seccomp() *seccomp.Config {
 // AppArmor returns the AppArmor configuration
 func (c *RuntimeConfig) AppArmor() *apparmor.Config {
 	return c.apparmorConfig
+}
+
+// Rdt returns the RDT configuration
+func (c *RuntimeConfig) Rdt() *rdt.Config {
+	return c.rdtConfig
 }
 
 // CgroupManager returns the CgroupManager configuration
