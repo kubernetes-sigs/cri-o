@@ -15,21 +15,26 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	conmonconfig "github.com/containers/conmon/runner/config"
+	"github.com/containers/podman/v3/pkg/annotations"
+	"github.com/containers/podman/v3/pkg/checkpoint/crutils"
 	"github.com/containers/storage/pkg/pools"
 	"github.com/cri-o/cri-o/internal/log"
 	"github.com/cri-o/cri-o/pkg/config"
+	"github.com/cri-o/cri-o/pkg/criu"
 	"github.com/cri-o/cri-o/server/cri/types"
 	"github.com/cri-o/cri-o/server/metrics"
 	"github.com/cri-o/cri-o/utils"
 	"github.com/fsnotify/fsnotify"
 	json "github.com/json-iterator/go"
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/remotecommand"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilexec "k8s.io/utils/exec"
 )
@@ -72,7 +77,7 @@ type syncInfo struct {
 }
 
 // CreateContainer creates a container.
-func (r *runtimeOCI) CreateContainer(ctx context.Context, c *Container, cgroupParent string) (retErr error) {
+func (r *runtimeOCI) CreateContainer(ctx context.Context, c *Container, cgroupParent string, restore bool) (retErr error) {
 	if c.Spoofed() {
 		return nil
 	}
@@ -127,6 +132,31 @@ func (r *runtimeOCI) CreateContainer(ctx context.Context, c *Container, cgroupPa
 		}
 		args = append(args, "-i")
 	}
+	if restore {
+		logrus.Debugf("Restore is true %v", restore)
+		args = append(args, "--restore", c.CheckpointPath())
+		if c.Spec().Process.SelinuxLabel != "" {
+			args = append(
+				args,
+				"--runtime-opt",
+				fmt.Sprintf(
+					"--lsm-profile=selinux:%s",
+					c.Spec().Process.SelinuxLabel,
+				),
+			)
+		}
+		if c.Spec().Linux.MountLabel != "" {
+			args = append(
+				args,
+				"--runtime-opt",
+				fmt.Sprintf(
+					"--mount-context=%s",
+					c.Spec().Linux.MountLabel,
+				),
+			)
+		}
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"args": args,
 	}).Debugf("running conmon: %s", r.config.Conmon)
@@ -1096,6 +1126,226 @@ func prepareProcessExec(c *Container, cmd []string, tty bool) (processFile strin
 	return processFile, nil
 }
 
+// ReadConmonPidFile attempts to read conmon's pid from its pid file
+// This function makes no verification that this file should exist
+// it is up to the caller to verify that this container has a conmon
+func ReadConmonPidFile(c *Container) (int, error) {
+	contents, err := ioutil.ReadFile(c.conmonPidFilePath())
+	if err != nil {
+		return -1, err
+	}
+	// Convert it to an int
+	conmonPID, err := strconv.Atoi(string(contents))
+	if err != nil {
+		return -1, err
+	}
+	return conmonPID, nil
+}
+
 func (c *Container) conmonPidFilePath() string {
 	return filepath.Join(c.bundlePath, "conmon-pidfile")
+}
+
+// CheckpointContainer checkpoints a container.
+func (r *runtimeOCI) CheckpointContainer(ctx context.Context, c *Container, specgen *rspec.Spec, leaveRunning bool) error {
+	c.opLock.Lock()
+	defer c.opLock.Unlock()
+
+	if err := r.checkpointRestoreSupported(); err != nil {
+		return err
+	}
+
+	// Once CRIU infects the process in the container with the
+	// parasite, the parasite also wants to write to the log
+	// file which is outside of the container. Giving the log file
+	// the label of the container enables logging for the parasite.
+	if err := crutils.CRCreateFileWithLabel(c.Dir(), "dump.log", specgen.Linux.MountLabel); err != nil {
+		return err
+	}
+
+	// workPath will be used to store dump.log and stats-dump
+	workPath := c.Dir()
+	// imagePath is used by CRIU to store the actual checkpoint files
+	imagePath := c.CheckpointPath()
+
+	logrus.Debugf("Writing checkpoint to %s", imagePath)
+	logrus.Debugf("Writing checkpoint logs to %s", workPath)
+	args := []string{}
+	args = append(
+		args,
+		"--criu",
+		r.config.CriuPath,
+		rootFlag,
+		r.root,
+		"checkpoint",
+		"--image-path",
+		imagePath,
+		"--work-path",
+		workPath,
+	)
+	if leaveRunning {
+		args = append(args, "--leave-running")
+	}
+
+	args = append(args, c.id)
+
+	_, err := utils.ExecCmd(r.path, args...)
+	if err != nil {
+		return errors.Wrapf(err, "Running %q %q failed", r.path, args)
+	}
+
+	if !leaveRunning {
+		c.state.Status = ContainerStateStopped
+		c.state.ExitCode = utils.Int32Ptr(0)
+		c.state.Finished = time.Now()
+	}
+
+	return nil
+}
+
+// RestoreContainer restores a container.
+func (r *runtimeOCI) RestoreContainer(ctx context.Context, c *Container, sbSpec *rspec.Spec, infraPid int, cgroupParent string) error {
+	c.opLock.Lock()
+	defer c.opLock.Unlock()
+
+	if err := r.checkpointRestoreSupported(); err != nil {
+		return err
+	}
+
+	// Let's try to stat() CRIU's inventory file. If it does not exist, it makes
+	// no sense to try a restore. This is a minimal check if a checkpoint exist.
+	if _, err := os.Stat(filepath.Join(c.CheckpointPath(), "inventory.img")); os.IsNotExist(err) {
+		return errors.Wrapf(err, "A complete checkpoint for this container cannot be found, cannot restore")
+	}
+
+	// remove conmon files
+	attachFile := filepath.Join(c.BundlePath(), "attach")
+	if err := os.Remove(attachFile); err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "error removing container %s attach file", c.ID())
+	}
+
+	ctlFile := filepath.Join(c.BundlePath(), "ctl")
+	if err := os.Remove(ctlFile); err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "error removing container %s ctl file", c.ID())
+	}
+
+	winszFile := filepath.Join(c.BundlePath(), "winsz")
+	if err := os.Remove(winszFile); err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "error removing container %s winsz file", c.ID())
+	}
+
+	// Figure out if this container will be restored in another sandbox
+	oldSbID := c.Sandbox()
+	if oldSbID == "" {
+		return fmt.Errorf("failed to detect sandbox of to be restored container %s", c.ID())
+	}
+	newSbID := sbSpec.Annotations[annotations.SandboxID]
+	if newSbID == "" {
+		return fmt.Errorf("failed to detect destination sandbox of to be restored container %s", c.ID())
+	}
+
+	// Get config.json to adapt for restore (mostly annotations for restore in another sandbox)
+	configFile := filepath.Join(c.BundlePath(), "config.json")
+	specgen, err := generate.NewFromFile(configFile)
+	if err != nil {
+		return err
+	}
+
+	if oldSbID != newSbID {
+		// The container will be restored in another (not the original) sandbox
+		// Adapt to namespaces of the new sandbox
+		for i, n := range specgen.Config.Linux.Namespaces {
+			if n.Path == "" {
+				// The namespace in the original container did not point to
+				// an existing interface. Leave it as it is.
+				continue
+			}
+			for _, on := range sbSpec.Linux.Namespaces {
+				if on.Type == n.Type {
+					var nsPath string
+					if n.Type == rspec.NetworkNamespace {
+						// Type for network namespaces is 'network'.
+						// The kernel link is 'net'.
+						nsPath = fmt.Sprintf("/proc/%d/ns/%s", infraPid, "net")
+					} else {
+						nsPath = fmt.Sprintf("/proc/%d/ns/%s", infraPid, n.Type)
+					}
+					specgen.Config.Linux.Namespaces[i].Path = nsPath
+					break
+				}
+			}
+		}
+
+		// Update Sandbox Name
+		specgen.AddAnnotation(annotations.SandboxName, sbSpec.Annotations[annotations.Name])
+		// Update Sandbox ID
+		specgen.AddAnnotation(annotations.SandboxID, newSbID)
+
+		// Update Name
+		ctrMetadata := runtime.ContainerMetadata{}
+		err = json.Unmarshal([]byte(sbSpec.Annotations[annotations.Metadata]), &ctrMetadata)
+		if err != nil {
+			return err
+		}
+		ctrName := ctrMetadata.Name
+
+		podMetadata := runtime.PodSandboxMetadata{}
+		err = json.Unmarshal([]byte(specgen.Config.Annotations[annotations.Metadata]), &podMetadata)
+		if err != nil {
+			return err
+		}
+		uid := podMetadata.Uid
+		mData := fmt.Sprintf("k8s_%s_%s_%s_%s0", ctrName, sbSpec.Annotations[annotations.KubeName], sbSpec.Annotations[annotations.Namespace], uid)
+		specgen.AddAnnotation(annotations.Name, mData)
+
+		c.sandbox = newSbID
+
+		saveOptions := generate.ExportOptions{}
+		if err := specgen.SaveToFile(configFile, saveOptions); err != nil {
+			return err
+		}
+	}
+
+	c.state.InitPid = 0
+	c.state.InitStartTime = ""
+
+	// It is possible to tell runc to place the CRIU log files
+	// at a custom location '--work-path'. But for restoring a
+	// container we are not calling runc directly but conmon, which
+	// then calls runc. It would be possible to change conmon to
+	// also have the log file in the same location as during
+	// checkpointing, but it is not really that important right now.
+	if err := crutils.CRCreateFileWithLabel(c.BundlePath(), "restore.log", specgen.Config.Linux.MountLabel); err != nil {
+		return err
+	}
+
+	if err := r.CreateContainer(ctx, c, cgroupParent, true); err != nil {
+		return err
+	}
+
+	// Once the container is restored, update the metadata
+	// 1. Container is running again
+	c.state.Status = ContainerStateRunning
+	// 2. Update PID of the container (without that stopping will fail)
+	pid, err := ReadConmonPidFile(c)
+	if err != nil {
+		return err
+	}
+	c.state.Pid = pid
+	// 3. Reset ExitCode (also needed for stopping)
+	c.state.ExitCode = nil
+	// 4. Set start time
+	c.state.Started = time.Now()
+
+	return nil
+}
+
+func (r *runtimeOCI) checkpointRestoreSupported() error {
+	if !criu.CheckForCriu() {
+		return errors.Errorf("checkpoint/restore requires at least CRIU %d", criu.MinCriuVersion)
+	}
+	if !crutils.CRRuntimeSupportsCheckpointRestore(r.path) {
+		return errors.Errorf("configured runtime does not support checkpoint/restore")
+	}
+	return nil
 }

@@ -251,6 +251,24 @@ var _ = t.Describe("Container", func() {
 			Expect(sut.ReadOnly(true)).To(Equal(true))
 		})
 	})
+	t.Describe("Restore", func() {
+		It("should not be restore by default", func() {
+			// Given
+			// When
+			// Then
+			Expect(sut.Restore()).To(BeFalse())
+		})
+		It("should be restore when specified", func() {
+			// Given
+			Expect(sut.Restore()).To(BeFalse())
+
+			// When
+			sut.SetRestore(true)
+
+			// Then
+			Expect(sut.Restore()).To(BeTrue())
+		})
+	})
 	t.Describe("SelinuxLabel", func() {
 		BeforeEach(func() {
 			config.Linux = &types.LinuxContainerConfig{

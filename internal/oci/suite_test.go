@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cri-o/cri-o/internal/oci"
+	libconfig "github.com/cri-o/cri-o/pkg/config"
 	. "github.com/cri-o/cri-o/test/framework"
 	containerstoragemock "github.com/cri-o/cri-o/test/mocks/containerstorage"
 	"github.com/golang/mock/gomock"
@@ -19,10 +20,27 @@ func TestOci(t *testing.T) {
 }
 
 var (
-	t         *TestFramework
-	mockCtrl  *gomock.Controller
-	storeMock *containerstoragemock.MockStore
+	t           *TestFramework
+	mockCtrl    *gomock.Controller
+	storeMock   *containerstoragemock.MockStore
+	myContainer *oci.Container
+	config      *libconfig.Config
 )
+
+const (
+	sandboxID   = "sandboxID"
+	containerID = "containerID"
+)
+
+func beforeEach(sbID string) {
+	var err error
+	myContainer, err = oci.NewContainer(containerID, "", "", "",
+		make(map[string]string), make(map[string]string),
+		make(map[string]string), "", "", "",
+		&oci.Metadata{}, sbID, false,
+		false, false, "", "", time.Now(), "")
+	Expect(err).To(BeNil())
+}
 
 var _ = BeforeSuite(func() {
 	t = NewTestFramework(NilFunc, NilFunc)

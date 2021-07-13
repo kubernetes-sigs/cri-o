@@ -257,6 +257,9 @@ func mergeConfig(config *libconfig.Config, ctx *cli.Context) error {
 	if ctx.IsSet("container-exits-dir") {
 		config.ContainerExitsDir = ctx.String("container-exits-dir")
 	}
+	if ctx.IsSet("criu-path") {
+		config.CriuPath = ctx.String("criu-path")
+	}
 	if ctx.IsSet("ctr-stop-timeout") {
 		config.CtrStopTimeout = ctx.Int64("ctr-stop-timeout")
 	}
@@ -893,6 +896,11 @@ func getCrioFlags(defConf *libconfig.Config) []cli.Flag {
 			Value:   cli.NewStringSlice(defConf.AbsentMountSourcesToReject...),
 			Usage:   "A list of paths that, when absent from the host, will cause a container creation to fail (as opposed to the current behavior of creating a directory).",
 			EnvVars: []string{"CONTAINER_ABSENT_MOUNT_SOURCES_TO_REJECT"},
+		},
+		&cli.StringFlag{
+			Name:    "criu-path",
+			Usage:   fmt.Sprintf("The path to find the criu binary, which is needed to checkpoint and restore containers. Will be searched for in $PATH if empty (default: %q)", defConf.CriuPath),
+			EnvVars: []string{"CONTAINER_CRIU_PATH"},
 		},
 	}
 }

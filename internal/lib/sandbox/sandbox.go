@@ -57,6 +57,7 @@ type Sandbox struct {
 	infraContainer     *oci.Container
 	metadata           *Metadata
 	nsOpts             *types.NamespaceOption
+	dnsConfig          *types.DNSConfig
 	stopMutex          sync.RWMutex
 	created            bool
 	stopped            bool
@@ -143,6 +144,16 @@ func (s *Sandbox) SetNamespaceOptions(nsOpts *types.NamespaceOption) {
 // NamespaceOptions returns the namespace options for the sandbox
 func (s *Sandbox) NamespaceOptions() *types.NamespaceOption {
 	return s.nsOpts
+}
+
+// SetDNSConfig sets the DNSConfig
+func (s *Sandbox) SetDNSConfig(dnsConfig *types.DNSConfig) {
+	s.dnsConfig = dnsConfig
+}
+
+// DNSConfig returns the dnsConfig for the sandbox
+func (s *Sandbox) DNSConfig() *types.DNSConfig {
+	return s.dnsConfig
 }
 
 // StopMutex returns the mutex to use when stopping the sandbox

@@ -89,7 +89,7 @@ func newRuntimeVM(path, root, configPath string) RuntimeImpl {
 }
 
 // CreateContainer creates a container.
-func (r *runtimeVM) CreateContainer(ctx context.Context, c *Container, cgroupParent string) (retErr error) {
+func (r *runtimeVM) CreateContainer(ctx context.Context, c *Container, cgroupParent string, restore bool) (retErr error) {
 	log.Debugf(ctx, "RuntimeVM.CreateContainer() start")
 	defer log.Debugf(ctx, "RuntimeVM.CreateContainer() end")
 
@@ -982,4 +982,20 @@ func (r *runtimeVM) closeIO(ctrID, execID string) error {
 	}
 
 	return nil
+}
+
+// CheckpointContainer not implemented for runtimeVM
+func (r *runtimeVM) CheckpointContainer(ctx context.Context, c *Container, specgen *rspec.Spec, leaveRunning bool) error {
+	logrus.Debug("runtimeVM.CheckpointContainer() start")
+	defer logrus.Debug("runtimeVM.CheckpointContainer() end")
+
+	return errors.New("Checkpointing not implemented for runtimeVM")
+}
+
+// RestoreContainer not implemented for runtimeVM
+func (r *runtimeVM) RestoreContainer(ctx context.Context, c *Container, sbSpec *rspec.Spec, infraPid int, cgroupParent string) error {
+	logrus.Debug("runtimeVM.RestoreContainer() start")
+	defer logrus.Debug("runtimeVM.RestoreContainer() end")
+
+	return errors.New("Restoring not implemented for runtimeVM")
 }

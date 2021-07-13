@@ -1,11 +1,17 @@
 package oci_test
 
 import (
+	"context"
+	"io/ioutil"
+	"os"
+
 	"github.com/cri-o/cri-o/internal/oci"
 	"github.com/cri-o/cri-o/pkg/annotations"
-	"github.com/cri-o/cri-o/pkg/config"
+	libconfig "github.com/cri-o/cri-o/pkg/config"
+	"github.com/cri-o/cri-o/pkg/criu"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // The actual test suite
@@ -13,7 +19,7 @@ var _ = t.Describe("Oci", func() {
 	t.Describe("New", func() {
 		It("should succeed with default config", func() {
 			// Given
-			c, err := config.DefaultConfig()
+			c, err := libconfig.DefaultConfig()
 			Expect(err).To(BeNil())
 
 			// When
@@ -36,7 +42,7 @@ var _ = t.Describe("Oci", func() {
 			performanceRuntime = "high-performance"
 			vmRuntime          = "kata"
 		)
-		runtimes := config.Runtimes{
+		runtimes := libconfig.Runtimes{
 			defaultRuntime: {
 				RuntimePath: "/bin/sh",
 				RuntimeType: "",
@@ -70,12 +76,13 @@ var _ = t.Describe("Oci", func() {
 		}
 
 		BeforeEach(func() {
-			c, err := config.DefaultConfig()
+			var err error
+			config, err = libconfig.DefaultConfig()
 			Expect(err).To(BeNil())
-			c.DefaultRuntime = defaultRuntime
-			c.Runtimes = runtimes
+			config.DefaultRuntime = defaultRuntime
+			config.Runtimes = runtimes
 
-			sut = oci.New(c)
+			sut = oci.New(config)
 			Expect(sut).NotTo(BeNil())
 		})
 
@@ -113,7 +120,7 @@ var _ = t.Describe("Oci", func() {
 
 			// Then
 			Expect(err).To(BeNil())
-			Expect(runtimeType).To(Equal(config.RuntimeTypeVM))
+			Expect(runtimeType).To(Equal(libconfig.RuntimeTypeVM))
 		})
 		Context("FilterDisallowedAnnotations", func() {
 			It("should succeed to filter disallowed annotation", func() {
@@ -173,6 +180,180 @@ var _ = t.Describe("Oci", func() {
 			// Then
 			Expect(err).To(BeNil())
 			Expect(privileged).To(Equal(false))
+		})
+		It("CheckpointContainer should succeed", func() {
+			if !criu.CheckForCriu() {
+				Skip("CRIU is missing or too old.")
+			}
+			// Given
+			beforeEach(sandboxID)
+			defer func() { os.RemoveAll("dump.log") }()
+			config.Runtimes["runc"] = &libconfig.RuntimeHandler{
+				RuntimePath: "/bin/true",
+			}
+
+			specgen := &specs.Spec{
+				Version: "1.0.0",
+				Process: &specs.Process{
+					SelinuxLabel: "",
+				},
+				Linux: &specs.Linux{
+					MountLabel: "",
+				},
+			}
+			// When
+			err := sut.CheckpointContainer(context.Background(), myContainer, specgen, false)
+
+			// Then
+			Expect(err).To(BeNil())
+		})
+		It("CheckpointContainer should fail", func() {
+			if !criu.CheckForCriu() {
+				Skip("CRIU is missing or too old.")
+			}
+			// Given
+			defer func() { os.RemoveAll("dump.log") }()
+			beforeEach(sandboxID)
+			config.Runtimes["runc"] = &libconfig.RuntimeHandler{
+				RuntimePath: "/bin/false",
+			}
+
+			specgen := &specs.Spec{
+				Version: "1.0.0",
+				Process: &specs.Process{
+					SelinuxLabel: "",
+				},
+				Linux: &specs.Linux{
+					MountLabel: "",
+				},
+			}
+			// When
+			err := sut.CheckpointContainer(context.Background(), myContainer, specgen, true)
+
+			// Then
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(Equal("configured runtime does not support checkpoint/restore"))
+		})
+		It("RestoreContainer should fail with destination sandbox detection", func() {
+			if !criu.CheckForCriu() {
+				Skip("CRIU is missing or too old.")
+			}
+			// Given
+			beforeEach(sandboxID)
+			config.Runtimes["runc"] = &libconfig.RuntimeHandler{
+				RuntimePath: "/bin/true",
+			}
+
+			specgen := &specs.Spec{
+				Version: "1.0.0",
+			}
+			err := os.Mkdir("checkpoint", 0o700)
+			Expect(err).To(BeNil())
+			defer func() { os.RemoveAll("checkpoint") }()
+			inventory, err := os.OpenFile("checkpoint/inventory.img", os.O_RDONLY|os.O_CREATE, 0o644)
+			Expect(err).To(BeNil())
+			inventory.Close()
+
+			// When
+			err = sut.RestoreContainer(context.Background(), myContainer, specgen, 42, "no-parent-cgroup-exists")
+
+			// Then
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(Equal("failed to detect destination sandbox of to be restored container containerID"))
+		})
+		It("RestoreContainer should fail with destination sandbox detection", func() {
+			if !criu.CheckForCriu() {
+				Skip("CRIU is missing or too old.")
+			}
+			// Given
+			beforeEach("")
+			specgen := &specs.Spec{
+				Version: "1.0.0",
+			}
+			err := os.Mkdir("checkpoint", 0o700)
+			Expect(err).To(BeNil())
+			defer func() { os.RemoveAll("checkpoint") }()
+			inventory, err := os.OpenFile("checkpoint/inventory.img", os.O_RDONLY|os.O_CREATE, 0o644)
+			Expect(err).To(BeNil())
+			inventory.Close()
+
+			// When
+			err = sut.RestoreContainer(context.Background(), myContainer, specgen, 42, "no-parent-cgroup-exists")
+
+			// Then
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(Equal("failed to detect sandbox of to be restored container containerID"))
+		})
+		It("RestoreContainer should fail", func() {
+			if !criu.CheckForCriu() {
+				Skip("CRIU is missing or too old.")
+			}
+			// Given
+			beforeEach(sandboxID)
+			config.Runtimes["runc"] = &libconfig.RuntimeHandler{
+				RuntimePath: "/bin/true",
+			}
+
+			specgen := &specs.Spec{
+				Version:     "1.0.0",
+				Annotations: map[string]string{"io.kubernetes.cri-o.SandboxID": "sandboxID"},
+				Linux: &specs.Linux{
+					MountLabel: ".",
+				},
+				Process: &specs.Process{
+					SelinuxLabel: "",
+				},
+			}
+			myContainer.SetSpec(specgen)
+
+			err := os.Mkdir("checkpoint", 0o700)
+			Expect(err).To(BeNil())
+			defer func() { os.RemoveAll("checkpoint") }()
+			inventory, err := os.OpenFile("checkpoint/inventory.img", os.O_RDONLY|os.O_CREATE, 0o644)
+			Expect(err).To(BeNil())
+			inventory.Close()
+
+			err = ioutil.WriteFile(
+				"config.json",
+				[]byte(
+					`{"ociVersion": "1.0.0","annotations":`+
+						`{"io.kubernetes.cri-o.SandboxID": "sandboxID"},`+
+						`"linux": {"mountLabel": ""}}`,
+				),
+				0o644,
+			)
+			Expect(err).To(BeNil())
+			defer func() { os.RemoveAll("config.json") }()
+
+			config.Conmon = "/bin/true"
+
+			// When
+			err = sut.RestoreContainer(context.Background(), myContainer, specgen, 42, "no-parent-cgroup-exists")
+			defer func() { os.RemoveAll("restore.log") }()
+
+			// Then
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("failed to add conmon to systemd sandbox cgroup"))
+		})
+		It("RestoreContainer should fail with missing inventory", func() {
+			if !criu.CheckForCriu() {
+				Skip("CRIU is missing or too old.")
+			}
+			// Given
+			beforeEach(sandboxID)
+			specgen := &specs.Spec{
+				Version:     "1.0.0",
+				Annotations: map[string]string{"io.kubernetes.cri-o.SandboxID": "sandboxID"},
+				Linux: &specs.Linux{
+					MountLabel: ".",
+				},
+			}
+			// When
+			err := sut.RestoreContainer(context.Background(), myContainer, specgen, 42, "no-parent-cgroup-exists")
+
+			// Then
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(Equal("A complete checkpoint for this container cannot be found, cannot restore: stat checkpoint/inventory.img: no such file or directory"))
 		})
 	})
 

@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/containers/podman/v3/pkg/cgroups"
 	"github.com/containers/storage/pkg/idtools"
 	ann "github.com/cri-o/cri-o/pkg/annotations"
@@ -113,7 +114,7 @@ type ContainerState struct {
 }
 
 // NewContainer creates a container object.
-func NewContainer(id, name, bundlePath, logPath string, labels, crioAnnotations, annotations map[string]string, image, imageName, imageRef string, metadata *Metadata, sandbox string, terminal, stdin, stdinOnce bool, runtimeHandler, dir string, created time.Time, stopSignal string) (*Container, error) {
+func NewContainer(id, name, bundlePath, logPath string, labels, crioAnnotations, annotations map[string]string, image, imageName, imageRef string, md *Metadata, sandbox string, terminal, stdin, stdinOnce bool, runtimeHandler, dir string, created time.Time, stopSignal string) (*Container, error) {
 	state := &ContainerState{}
 	state.Created = created
 	c := &Container{
@@ -127,7 +128,7 @@ func NewContainer(id, name, bundlePath, logPath string, labels, crioAnnotations,
 		stdin:           stdin,
 		stdinOnce:       stdinOnce,
 		runtimeHandler:  runtimeHandler,
-		metadata:        metadata,
+		metadata:        md,
 		annotations:     annotations,
 		crioAnnotations: crioAnnotations,
 		image:           image,
@@ -351,6 +352,17 @@ func (c *Container) Sandbox() string {
 // Dir returns the dir of the container
 func (c *Container) Dir() string {
 	return c.dir
+}
+
+// CheckpointPath returns the path to the directory containing the checkpoint
+func (c *Container) CheckpointPath() string {
+	// Podman uses 'bundlePath' as base directory for the checkpoint
+	// CRI-O uses 'dir' instead of bundlePath as bundlePath seems to be
+	// normally based on a tmpfs which does not survive a reboot. Also, as
+	// the checkpoint contains all memory pages, it can be as large as the
+	// available memory and writing that again to a tmpfs might lead to
+	// problems. 'dir' seems to be based on /var
+	return filepath.Join(c.dir, metadata.CheckpointDirectory)
 }
 
 // Metadata returns the metadata of the container.

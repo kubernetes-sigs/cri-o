@@ -66,7 +66,7 @@ var _ = t.Describe("Container:LogPath", func() {
 
 		// When
 		Expect(sut.SetConfig(config, sboxConfig)).To(BeNil())
-		Expect(sut.SetNameAndID()).To(BeNil())
+		Expect(sut.SetNameAndID("")).To(BeNil())
 
 		// Then
 		logPath, err := sut.LogPath(providedLogDir)

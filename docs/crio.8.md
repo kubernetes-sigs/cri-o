@@ -28,6 +28,7 @@ crio
 [--conmon]=[value]
 [--container-attach-socket-dir]=[value]
 [--container-exits-dir]=[value]
+[--criu-path]=[value]
 [--ctr-stop-timeout]=[value]
 [--decryption-keys-path]=[value]
 [--default-capabilities]=[value]
@@ -163,6 +164,8 @@ crio [GLOBAL OPTIONS] command [COMMAND OPTIONS] [ARGUMENTS...]
 **--container-attach-socket-dir**="": Path to directory for container attach sockets (default: /var/run/crio)
 
 **--container-exits-dir**="": Path to directory in which container exit files are written to by conmon (default: /var/run/crio/exits)
+
+**--criu-path**="": The path to find the criu binary, which is needed to checkpoint and restore containers. Will be searched for in $PATH if empty (default: "")
 
 **--ctr-stop-timeout**="": The minimal amount of time in seconds to wait before issuing a timeout regarding the proper termination of the container. The lowest possible value is 30s, whereas lower values are not considered by CRI-O (default: 30)
 

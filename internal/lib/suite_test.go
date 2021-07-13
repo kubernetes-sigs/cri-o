@@ -30,6 +30,7 @@ func TestLib(t *testing.T) {
 
 var (
 	t              *TestFramework
+	config         *libconfig.Config
 	mockCtrl       *gomock.Controller
 	libMock        *libmock.MockIface
 	storeMock      *containerstoragemock.MockStore
@@ -106,6 +107,7 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	removeConfig()
 	t.Teardown()
 	mockCtrl.Finish()
 })
@@ -114,15 +116,22 @@ func removeState() {
 	_ = os.RemoveAll("state.json")
 }
 
+func removeConfig() {
+	_ = os.RemoveAll("config.json")
+}
+
 func beforeEach() {
 	// Remove old state files
 	removeState()
+	// Remove old config files
+	removeConfig()
 
 	// Only log panics for now
 	logrus.SetLevel(logrus.PanicLevel)
 
 	// Set the config
-	config, err := libconfig.DefaultConfig()
+	var err error
+	config, err = libconfig.DefaultConfig()
 	Expect(err).To(BeNil())
 	config.LogDir = "."
 	config.HooksDir = []string{}
@@ -174,4 +183,20 @@ func addContainerAndSandbox() {
 
 func createDummyState() {
 	Expect(ioutil.WriteFile("state.json", []byte("{}"), 0o644)).To(BeNil())
+}
+
+func createDummyConfig() {
+	Expect(ioutil.WriteFile("config.json", []byte(`{"linux":{},"process":{}}`), 0o644)).To(BeNil())
+}
+
+func mockRuncInLibConfig() {
+	config.Runtimes["runc"] = &libconfig.RuntimeHandler{
+		RuntimePath: "/bin/echo",
+	}
+}
+
+func mockRuncToFalseInLibConfig() {
+	config.Runtimes["runc"] = &libconfig.RuntimeHandler{
+		RuntimePath: "/bin/false",
+	}
 }

@@ -47,6 +47,7 @@ var _ = t.Describe("Container", func() {
 		Expect(sut.ImageRef()).To(Equal("imageRef"))
 		Expect(sut.Sandbox()).To(Equal("sandbox"))
 		Expect(sut.Dir()).To(Equal("dir"))
+		Expect(sut.CheckpointPath()).To(Equal("dir/checkpoint"))
 		Expect(sut.StatePath()).To(Equal("dir/state.json"))
 		Expect(sut.Metadata()).To(Equal(&oci.Metadata{}))
 		Expect(sut.StateNoLock().Version).To(BeEmpty())

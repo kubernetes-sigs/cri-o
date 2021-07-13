@@ -361,6 +361,11 @@ func initCrioTemplateConfig(c *Config) ([]*templateConfigValue, error) {
 			isDefaultValue: simpleEqual(dc.PinnsPath, c.PinnsPath),
 		},
 		{
+			templateString: templateStringCrioRuntimeCriuPath,
+			group:          crioRuntimeConfig,
+			isDefaultValue: simpleEqual(dc.CriuPath, c.CriuPath),
+		},
+		{
 			templateString: templateStringCrioRuntimeDefaultRuntime,
 			group:          crioRuntimeConfig,
 			isDefaultValue: simpleEqual(dc.DefaultRuntime, c.DefaultRuntime),
@@ -912,7 +917,15 @@ pinns_path = "{{ .PinnsPath }}"
 
 `
 
+const templateStringCrioRuntimeCriuPath = `# pinns_path is the path to find the pinns binary, which is needed to manage namespace lifecycle
+# criu_path is the path to find the criu binary, which is needed to
+# checkpoint and restore container or pods.
+criu_path = "{{ .CriuPath }}"
+
+`
+
 const templateStringCrioRuntimeDefaultRuntime = `# default_runtime is the _name_ of the OCI runtime to be used as the default.
+# default_runtime is the _name_ of the OCI runtime to be used as the default.
 # The name is matched against the runtimes map below. If this value is changed,
 # the corresponding existing entry from the runtimes map below will be ignored.
 default_runtime = "{{ .DefaultRuntime }}"
