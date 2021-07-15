@@ -157,7 +157,7 @@ func (c *container) SpecAddAnnotations(ctx context.Context, sb *sandbox.Sandbox,
 	// The sandbox annotations are already filtered for the allowed
 	// annotations, there is no need to check it additionally here.
 	for k, v := range sb.Annotations() {
-		if strings.HasPrefix(k, crioann.OCISeccompBPFHookAnnotation) {
+		if k == crioann.OCISeccompBPFHookAnnotation + "/" + c.config.Metadata.Name {
 			// The OCI seccomp BPF hook
 			// (https://github.com/containers/oci-seccomp-bpf-hook)
 			// uses the annotation io.containers.trace-syscall as indicator
@@ -171,17 +171,14 @@ func (c *container) SpecAddAnnotations(ctx context.Context, sb *sandbox.Sandbox,
 			// 'io.containers.trace-syscall' if the metadata name is equal
 			// to 'container'. This allows us to trace containers into
 			// distinguishable files.
-			if strings.TrimPrefix(k, crioann.OCISeccompBPFHookAnnotation+"/") == c.config.Metadata.Name {
-				log.Debugf(ctx,
-					"Annotation key for container %q rewritten to %q (value is: %q)",
-					c.config.Metadata.Name, crioann.OCISeccompBPFHookAnnotation, v,
-				)
-				c.config.Annotations[crioann.OCISeccompBPFHookAnnotation] = v
-				c.spec.AddAnnotation(crioann.OCISeccompBPFHookAnnotation, v)
-			} else {
-				// Annotation not suffixed with the container name
-				c.spec.AddAnnotation(k, v)
-			}
+			log.Debugf(ctx,
+				"Annotation key for container %q rewritten to %q (value is: %q)",
+				c.config.Metadata.Name, crioann.OCISeccompBPFHookAnnotation, v,
+			)
+			c.config.Annotations[crioann.OCISeccompBPFHookAnnotation] = v
+			c.spec.AddAnnotation(crioann.OCISeccompBPFHookAnnotation, v)
+		} else {
+			c.spec.AddAnnotation(k, v)
 		}
 	}
 
