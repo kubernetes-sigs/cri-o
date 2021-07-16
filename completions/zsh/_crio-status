@@ -1,11 +1,27 @@
 _cli_zsh_autocomplete() {
 
   local -a cmds
-  cmds=('complete:Generate bash, fish or zsh completions.' 'completion:Generate bash, fish or zsh completions.' 'man:Generate the man page documentation.' 'markdown:Generate the markdown documentation.' 'md:Generate the markdown documentation.' 'config:Show the configuration of CRI-O as TOML string.' 'c:Show the configuration of CRI-O as TOML string.' 'containers:Display detailed information about the provided container ID.' 'container:Display detailed information about the provided container ID.' 'cs:Display detailed information about the provided container ID.' 's:Display detailed information about the provided container ID.' 'info:Retrieve generic information about CRI-O, like the cgroup and storage driver.' 'i:Retrieve generic information about CRI-O, like the cgroup and storage driver.' 'help:Shows a list of commands or help for one command' 'h:Shows a list of commands or help for one command')
+  cmds=('complete:Generate bash, fish or zsh completions.'
+        'completion:Generate bash, fish or zsh completions.'
+        'man:Generate the man page documentation.'
+        'markdown:Generate the markdown documentation.'
+        'md:Generate the markdown documentation.'
+        'config:Show the configuration of CRI-O as TOML string.'
+        'c:Show the configuration of CRI-O as TOML string.'
+        'containers:Display detailed information about the provided container ID.'
+        'container:Display detailed information about the provided container ID.'
+        'cs:Display detailed information about the provided container ID.'
+        's:Display detailed information about the provided container ID.'
+        'info:Retrieve generic information about CRI-O, like the cgroup and storage driver.'
+        'i:Retrieve generic information about CRI-O, like the cgroup and storage driver.'
+        'help:Shows a list of commands or help for one command'
+        'h:Shows a list of commands or help for one command')
   _describe 'commands' cmds
 
   local -a opts
-  opts=('--socket' '--help' '--version')
+  opts=('--socket'
+        '--help'
+        '--version')
   _describe 'global options' opts
 
   return
