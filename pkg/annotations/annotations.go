@@ -16,6 +16,10 @@ const (
 	// DevicesAnnotation is a set of devices to give to the container
 	DevicesAnnotation = "io.kubernetes.cri-o.Devices"
 
+	// DisableDeviceOwnershipFromSecurityContextAnnotation is the K8S annotation used by kubelet/device-plugins
+	// to opt-out getting Devices UID/GID set as RunAsUser/RunAsGroup
+	DisableDeviceOwnershipFromSecurityContextAnnotation = "io.kubernetes.cri.DisableDeviceOwnershipFromSecurityContext"
+
 	// CPULoadBalancingAnnotation indicates that load balancing should be disabled for CPUs used by the container
 	CPULoadBalancingAnnotation = "cpu-load-balancing.crio.io"
 

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	devicecfg "github.com/cri-o/cri-o/internal/config/device"
+	crioann "github.com/cri-o/cri-o/pkg/annotations"
+	"github.com/cri-o/cri-o/server/cri/types"
 	"github.com/cri-o/cri-o/utils"
 	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/opencontainers/runc/libcontainer/devices"
@@ -77,6 +79,8 @@ func (c *container) specAddHostDevicesIfPrivileged(privilegedWithoutHostDevices 
 func (c *container) specAddContainerConfigDevices() error {
 	sp := c.Spec().Config
 
+	disableDeviceOwnershipFromSecurityContext := checkDisableDeviceOwnershipFromSecurityContextAnnotation(c.Config().Annotations)
+
 	for _, device := range c.Config().Devices {
 		// pin the device to avoid using `device` within the range scope as
 		// wrong function literal
@@ -108,8 +112,8 @@ func (c *container) specAddContainerConfigDevices() error {
 				Type:  string(dev.Type),
 				Major: dev.Major,
 				Minor: dev.Minor,
-				UID:   &dev.Uid,
-				GID:   &dev.Gid,
+				UID:   getDeviceUID(c.Config(), dev.Uid, disableDeviceOwnershipFromSecurityContext),
+				GID:   getDeviceGID(c.Config(), dev.Gid, disableDeviceOwnershipFromSecurityContext),
 			}
 			c.Spec().AddDevice(rd)
 			sp.Linux.Resources.Devices = append(sp.Linux.Resources.Devices, rspec.LinuxDeviceCgroup{
@@ -162,4 +166,51 @@ func (c *container) specAddContainerConfigDevices() error {
 		}
 	}
 	return nil
+}
+
+func checkDisableDeviceOwnershipFromSecurityContextAnnotation(annotations map[string]string) bool {
+	if v, ok := annotations[crioann.DisableDeviceOwnershipFromSecurityContextAnnotation]; ok {
+		if v == "true" {
+			return true
+		}
+	}
+	return false
+}
+
+// getDeviceUID() and getDeviceGID() are used to find the right
+// uid/gid values for the device node created in the container
+// namespace. The runtime executes mknod() and chmod()s the created
+// device with the values returned here.
+//
+// TODO(mythi): In case of user namespaces, the runtime simply bind
+// mounts the the devices from the host. Additional logic is needed
+// to check that the runtimes effective UID/GID on the host has the
+// permissions to access the device node and/or the right user namespace
+// mappings are created.
+//
+// CRI-O has an experimental support for setting user namespace mappings
+// via annotations when pod's securitycontext runs as root/uid=0. When
+// enabled, the logic below does not change the behavior for existing
+// mappings unless container's securitycontext user/group overrides what
+// is set for the pod.
+//
+// Ref: https://github.com/kubernetes/kubernetes/issues/92211
+func getDeviceUID(config *types.ContainerConfig, hostUID uint32, disableDeviceOwnershipFromSecurityContext bool) *uint32 {
+	if userval := config.Linux.SecurityContext.RunAsUser; userval != nil {
+		uid := uint32(userval.Value)
+		if uid > 0 && !disableDeviceOwnershipFromSecurityContext {
+			return &uid
+		}
+	}
+	return &hostUID
+}
+
+func getDeviceGID(config *types.ContainerConfig, hostGID uint32, disableDeviceOwnershipFromSecurityContext bool) *uint32 {
+	if groupval := config.Linux.SecurityContext.RunAsGroup; groupval != nil {
+		gid := uint32(groupval.Value)
+		if gid > 0 && !disableDeviceOwnershipFromSecurityContext {
+			return &gid
+		}
+	}
+	return &hostGID
 }
