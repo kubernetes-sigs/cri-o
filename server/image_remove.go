@@ -32,6 +32,11 @@ func (s *Server) removeImage(ctx context.Context, imageRef string) error {
 			return err
 		}
 	}
+
+	if err != nil {
+		log.Errorf(ctx, "error deleting intermediate image %s: %v", img, err)
+	}
+
 	for _, img := range images {
 		err = s.StorageImageServer().UntagImage(s.config.SystemContext, img)
 		if err != nil {

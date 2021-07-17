@@ -312,8 +312,17 @@ func (svc *imageService) ListImages(systemContext *types.SystemContext, filter s
 			return nil, err
 		}
 		newImageCache := make(imageCache, len(images))
+
+		storageLayers, err := svc.GetStore().Layers()
+		if err != nil {
+			return nil, err
+		}
 		for i := range images {
 			image := &images[i]
+			// determines if an images is intermediate, and if it is, don't return it
+			if isIntermediate(image, storageLayers) {
+				continue
+			}
 			ref, err := istorage.Transport.ParseStoreReference(svc.store, "@"+image.ID)
 			if err != nil {
 				return nil, err
@@ -343,6 +352,25 @@ func (svc *imageService) ListImages(systemContext *types.SystemContext, filter s
 		svc.imageCacheLock.Unlock()
 	}
 	return results, nil
+}
+
+// determines if an images is intermediate
+func isIntermediate(image *storage.Image, storageLayers []storage.Layer) bool {
+	if len(image.Names) == 0 && !layerIsLeaf(storageLayers, image.TopLayer) {
+		return true
+	}
+
+	return false
+}
+
+// helper function for isIntermediate to determine if a layer is a leaf
+func layerIsLeaf(storageLayers []storage.Layer, layer string) bool {
+	for i := 0; i < len(storageLayers); i++ {
+		if storageLayers[i].Parent == layer {
+			return false
+		}
+	}
+	return true
 }
 
 func (svc *imageService) ImageStatus(systemContext *types.SystemContext, nameOrID string) (*ImageResult, error) {
@@ -667,6 +695,65 @@ func (svc *imageLookupService) getReferences(inputSystemContext *types.SystemCon
 	return srcSystemContext, srcRef, destRef, nil
 }
 
+// recurses through all of the layers that belong to the image and deletes the image
+func (svc *imageService) recurseIntermediateLayers(layer *storage.Layer, imgID string) error {
+	storageImages, err := svc.store.Images()
+	if err != nil {
+		return fmt.Errorf("failed to get images when removing intermediate images")
+	}
+
+	if layer.Parent == "" {
+		return nil
+	}
+
+	for i := range storageImages {
+		if storageImages[i].TopLayer != layer.ID || storageImages[i].ID == imgID {
+			continue
+		}
+
+		layer2, err := svc.GetStore().Layer(layer.Parent)
+		if err != nil {
+			return fmt.Errorf("failed to get layer when removing intermediate images")
+		}
+
+		err = svc.recurseIntermediateLayers(layer2, imgID)
+		if err != nil {
+			return err
+		}
+
+		_, err = svc.store.DeleteImage(storageImages[i].ID, true)
+		if err != nil {
+			return fmt.Errorf("failed to delete image %v", storageImages[i].ID)
+		}
+
+		logrus.Infof("removed intermediate image %v", storageImages[i].ID)
+	}
+	return nil
+}
+
+// gets the first layer in the tree to remove, and passes that to helper function recurseIntermediateLayers
+func (svc *imageService) removeIntermediate(ref types.ImageReference) error {
+	img, err := istorage.Transport.GetStoreImage(svc.store, ref)
+	if err != nil {
+		return fmt.Errorf("failed to get store image")
+	}
+
+	storageLayers, err := svc.GetStore().Layers()
+	if err != nil {
+		return fmt.Errorf("failed to get storage layers %s", err)
+	}
+
+	for i := range storageLayers {
+		if storageLayers[i].ID == img.TopLayer {
+			err = svc.recurseIntermediateLayers(&storageLayers[i], img.ID)
+			if err != nil {
+				return fmt.Errorf("failed to delete intermediate images")
+			}
+		}
+	}
+	return nil
+}
+
 func (svc *imageService) UntagImage(systemContext *types.SystemContext, nameOrID string) error {
 	ref, err := svc.getRef(nameOrID)
 	if err != nil {
@@ -698,6 +785,10 @@ func (svc *imageService) UntagImage(systemContext *types.SystemContext, nameOrID
 		if len(prunedNames) > 0 {
 			return svc.store.SetNames(img.ID, prunedNames)
 		}
+	}
+	err = svc.removeIntermediate(ref)
+	if err != nil {
+		return err
 	}
 
 	return ref.DeleteImage(svc.ctx, systemContext)

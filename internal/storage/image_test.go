@@ -324,6 +324,8 @@ var _ = t.Describe("Image", func() {
 			inOrder(
 				mockGetRef(),
 				mockGetStoreImage(storeMock, testNormalizedImageName, testSHA256),
+				mockGetStoreImage(storeMock, testNormalizedImageName, testSHA256),
+				storeMock.EXPECT().Layers().Return([]cs.Layer{}, nil),
 				mockResolveImage(storeMock, testNormalizedImageName, testSHA256),
 				storeMock.EXPECT().DeleteImage(testSHA256, true).
 					Return(nil, nil),
@@ -364,6 +366,8 @@ var _ = t.Describe("Image", func() {
 			const imageName = "docker://localhost/busybox:latest"
 			inOrder(
 				mockGetStoreImage(storeMock, "localhost/busybox:latest", testSHA256),
+				mockGetStoreImage(storeMock, "localhost/busybox:latest", testSHA256),
+				storeMock.EXPECT().Layers().Return([]cs.Layer{}, nil),
 			)
 
 			// When
@@ -378,6 +382,9 @@ var _ = t.Describe("Image", func() {
 			const imageName = "docker://localhost/busybox@sha256:" + testSHA256
 			inOrder(
 				mockGetStoreImage(storeMock, "localhost/busybox@sha256:"+testSHA256, testSHA256),
+
+				mockGetStoreImage(storeMock, "localhost/busybox@sha256:"+testSHA256, testSHA256),
+				storeMock.EXPECT().Layers().Return([]cs.Layer{}, nil),
 			)
 
 			// When
@@ -391,15 +398,13 @@ var _ = t.Describe("Image", func() {
 			// Given
 			inOrder(
 				mockGetRef(),
-				// storage.Transport.GetStoreImage:
 				storeMock.EXPECT().Image(testNormalizedImageName).
 					Return(&cs.Image{
 						ID:    testSHA256,
 						Names: []string{testNormalizedImageName, "localhost/b:latest", "localhost/c:latest"},
 					}, nil),
 
-				storeMock.EXPECT().SetNames(testSHA256, []string{"localhost/b:latest", "localhost/c:latest"}).
-					Return(t.TestError),
+				storeMock.EXPECT().SetNames(testSHA256, []string{"localhost/b:latest", "localhost/c:latest"}).Return(t.TestError),
 			)
 
 			// When
@@ -407,6 +412,42 @@ var _ = t.Describe("Image", func() {
 
 			// Then
 			Expect(err).NotTo(BeNil())
+		})
+
+		It("should remove intermediate images", func() {
+			// Given
+			storeMock.EXPECT().Layers().Return([]cs.Layer{
+				{ID: "topLayer1", Parent: "topLayer2"},
+				{ID: "topLayer2", Parent: "topLayer3"},
+				{ID: "topLayer3", Parent: ""},
+			}, nil).AnyTimes()
+
+			storeMock.EXPECT().GraphOptions().Return([]string{}).AnyTimes()
+			storeMock.EXPECT().GraphDriverName().Return("").AnyTimes()
+			storeMock.EXPECT().GraphRoot().Return("").AnyTimes()
+			storeMock.EXPECT().RunRoot().Return("").AnyTimes()
+
+			storeMock.EXPECT().Image(testSHA256[0:62]+"01").
+				Return(&cs.Image{
+					ID:       testSHA256[0:62] + "01",
+					TopLayer: "topLayer1",
+				}, nil).AnyTimes()
+			storeMock.EXPECT().Images().Return(
+				[]cs.Image{
+					{ID: testSHA256[0:62] + "01", TopLayer: "topLayer1"},
+					{ID: testSHA256[0:62] + "02", TopLayer: "topLayer2"},
+					{ID: testSHA256[0:62] + "03", TopLayer: "topLayer3"},
+				},
+				nil).AnyTimes()
+			storeMock.EXPECT().Layer("topLayer2").Return(&cs.Layer{
+				ID: "topLayer2", Parent: "",
+			}, nil).AnyTimes()
+
+			storeMock.EXPECT().DeleteImage(testSHA256[0:62]+"01", true).Return(nil, nil).AnyTimes()
+			storeMock.EXPECT().DeleteImage(testSHA256[0:62]+"02", true).Return(nil, nil).AnyTimes()
+
+			err := sut.UntagImage(&types.SystemContext{}, testSHA256[0:62]+"01")
+			Expect(err).To(BeNil())
 		})
 	})
 
@@ -491,6 +532,7 @@ var _ = t.Describe("Image", func() {
 			// Given
 			gomock.InOrder(
 				storeMock.EXPECT().Images().Return([]cs.Image{}, nil),
+				storeMock.EXPECT().Layers().Return([]cs.Layer{}, nil),
 			)
 
 			// When
@@ -505,6 +547,7 @@ var _ = t.Describe("Image", func() {
 			// Given
 			mockLoop := func() mockSequence {
 				return inOrder(
+					mockParseStoreReference(storeMock, "@"+testSHA256),
 					// buildImageCacheItem:
 					mockNewImage(storeMock, testSHA256, testSHA256),
 					// makeRepoDigests:
@@ -519,9 +562,8 @@ var _ = t.Describe("Image", func() {
 						{ID: testSHA256},
 					},
 					nil),
-				mockParseStoreReference(storeMock, "@"+testSHA256),
+				storeMock.EXPECT().Layers().Return([]cs.Layer{}, nil),
 				mockLoop(),
-				mockParseStoreReference(storeMock, "@"+testSHA256),
 				mockLoop(),
 			)
 
@@ -621,6 +663,7 @@ var _ = t.Describe("Image", func() {
 			gomock.InOrder(
 				storeMock.EXPECT().Images().Return(
 					[]cs.Image{{ID: ""}}, nil),
+				storeMock.EXPECT().Layers().Return([]cs.Layer{}, nil),
 			)
 
 			// When
@@ -636,6 +679,7 @@ var _ = t.Describe("Image", func() {
 			inOrder(
 				storeMock.EXPECT().Images().Return(
 					[]cs.Image{{ID: testSHA256}}, nil),
+				storeMock.EXPECT().Layers().Return([]cs.Layer{}, nil),
 				mockParseStoreReference(storeMock, "@"+testSHA256),
 				storeMock.EXPECT().Image(gomock.Any()).
 					Return(nil, t.TestError),
@@ -647,6 +691,75 @@ var _ = t.Describe("Image", func() {
 			// Then
 			Expect(err).NotTo(BeNil())
 			Expect(res).To(BeNil())
+		})
+
+		It("should succeed to not list intermediate images", func() {
+			// Given
+			mockLoop := func() mockSequence {
+				return inOrder(
+					mockParseStoreReference(storeMock, "@"+testSHA256),
+					// buildImageCacheItem:
+					mockNewImage(storeMock, testSHA256, testSHA256),
+					// makeRepoDigests:
+					storeMock.EXPECT().ImageBigDataDigest(testSHA256, gomock.Any()).
+						Return(digest.Digest(""), nil),
+				)
+			}
+			inOrder(
+				storeMock.EXPECT().Images().Return(
+					[]cs.Image{
+						{ID: testSHA256, Names: []string{"a", "b", "c@sha256:" + testSHA256}},
+						{ID: testSHA256},
+					},
+					nil),
+				// creates a layer with the parent of one of the images just returned
+				storeMock.EXPECT().Layers().Return([]cs.Layer{{Parent: testSHA256}}, nil),
+				mockLoop(),
+				mockLoop(),
+			)
+
+			// When
+			res, err := sut.ListImages(&types.SystemContext{}, "")
+
+			// Then
+			Expect(err).To(BeNil())
+			Expect(len(res)).To(Equal(2))
+		})
+
+		It("should succeed to omit an intermediate image", func() {
+			// Given
+			mockLoop := func() mockSequence {
+				return inOrder(
+					mockParseStoreReference(storeMock, "@"+testSHA256),
+					// buildImageCacheItem:
+					mockNewImage(storeMock, testSHA256, testSHA256),
+					// makeRepoDigests:
+					storeMock.EXPECT().ImageBigDataDigest(testSHA256, gomock.Any()).
+						Return(digest.Digest(""), nil),
+				)
+			}
+			inOrder(
+				storeMock.EXPECT().Images().Return(
+					[]cs.Image{
+						{ID: testSHA256, Names: []string{"a", "b", "c@sha256:" + testSHA256}},
+						{ID: "ID2", TopLayer: "testTopLayer1"},
+						{ID: "ID3", TopLayer: "testTopLayer2"},
+					},
+					nil),
+				// creates a layer with the parent of one of the images just returned
+				storeMock.EXPECT().Layers().Return([]cs.Layer{
+					{ID: "ID2", Parent: "testTopLayer1"},
+					{ID: "ID3", Parent: "testTopLayer2"},
+				}, nil),
+				mockLoop(),
+			)
+
+			// When
+			res, err := sut.ListImages(&types.SystemContext{}, "")
+
+			// Then
+			Expect(err).To(BeNil())
+			Expect(len(res)).To(Equal(1))
 		})
 	})
 

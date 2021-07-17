@@ -36,7 +36,7 @@ func (c *Config) LoadUlimits(ulimits []string) error {
 		if err != nil {
 			return err
 		}
-		// This sucks, but it's the runtime-tools interface
+		// This isn't ideal, but it's the runtime-tools interface
 		c.ulimits = append(c.ulimits, Ulimit{
 			Name: "RLIMIT_" + strings.ToUpper(ul.Name),
 			Hard: rl.Hard,

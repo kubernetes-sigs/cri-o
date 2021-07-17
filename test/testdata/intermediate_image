@@ -1,0 +1,4 @@
+FROM fedora
+RUN touch foo
+ENV myenv=test
+RUN mkdir tests
