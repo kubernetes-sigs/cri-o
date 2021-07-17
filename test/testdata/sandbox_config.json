@@ -8,7 +8,7 @@
 	"hostname": "crictl_host",
 	"log_directory": "",
 	"dns_config": {
-		"searches": [
+		"servers": [
 			"8.8.8.8"
 		]
 	},
