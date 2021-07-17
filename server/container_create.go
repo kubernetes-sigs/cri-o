@@ -307,13 +307,15 @@ func setupCapabilities(specgen *generate.Generator, caps *types.Capability, defa
 	addAll := inStringSlice(caps.AddCapabilities, "ALL")
 	dropAll := inStringSlice(caps.DropCapabilities, "ALL")
 
+	var addDefaultCapbilities bool
+
 	// Only add the default capabilities to the AddCapabilities list
 	// if neither add or drop are set to "ALL". If add is set to "ALL" it
 	// is a super set of the default capabilties. If drop is set to "ALL"
 	// then we first want to clear the entire list (including defaults)
 	// so the user may selectively add *only* the capabilities they need.
 	if !(addAll || dropAll) {
-		caps.AddCapabilities = append(caps.AddCapabilities, defaultCaps...)
+		addDefaultCapbilities = true
 	}
 
 	// Add/drop all capabilities if "all" is specified, so that
@@ -354,6 +356,30 @@ func setupCapabilities(specgen *generate.Generator, caps *types.Capability, defa
 		}
 	}
 
+	if addDefaultCapbilities {
+		// Add default capabilities to every set excluding ambient set.
+		for _, cap := range defaultCaps {
+			capPrefixed := toCAPPrefixed(cap)
+			// Validate capability
+			if !inStringSlice(getOCICapabilitiesList(), capPrefixed) {
+				return fmt.Errorf("unknown capability %q to add", capPrefixed)
+			}
+			if err := specgen.AddProcessCapabilityBounding(capPrefixed); err != nil {
+				return err
+			}
+			if err := specgen.AddProcessCapabilityEffective(capPrefixed); err != nil {
+				return err
+			}
+			if err := specgen.AddProcessCapabilityInheritable(capPrefixed); err != nil {
+				return err
+			}
+			if err := specgen.AddProcessCapabilityPermitted(capPrefixed); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Add the explicitly added capabilities to every set including ambient set.
 	for _, cap := range caps.AddCapabilities {
 		if strings.EqualFold(cap, "ALL") {
 			continue
@@ -375,6 +401,9 @@ func setupCapabilities(specgen *generate.Generator, caps *types.Capability, defa
 		if err := specgen.AddProcessCapabilityPermitted(capPrefixed); err != nil {
 			return err
 		}
+		if err := specgen.AddProcessCapabilityAmbient(capPrefixed); err != nil {
+			return err
+		}
 	}
 
 	for _, cap := range caps.DropCapabilities {
@@ -392,6 +421,9 @@ func setupCapabilities(specgen *generate.Generator, caps *types.Capability, defa
 			return fmt.Errorf("failed to drop cap %s %v", capPrefixed, err)
 		}
 		if err := specgen.DropProcessCapabilityPermitted(capPrefixed); err != nil {
+			return fmt.Errorf("failed to drop cap %s %v", capPrefixed, err)
+		}
+		if err := specgen.DropProcessCapabilityAmbient(capPrefixed); err != nil {
 			return fmt.Errorf("failed to drop cap %s %v", capPrefixed, err)
 		}
 	}
