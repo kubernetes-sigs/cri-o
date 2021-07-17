@@ -148,12 +148,7 @@ func (m *SystemdManager) SandboxCgroupPath(sbParent, sbID string) (cgParent, cgP
 	}
 
 	cgParent = convertCgroupFsNameToSystemd(sbParent)
-	slicePath, err := systemd.ExpandSlice(cgParent)
-	if err != nil {
-		return "", "", errors.Wrapf(err, "expanding systemd slice path for %q", cgParent)
-	}
-
-	if err := verifyCgroupHasEnoughMemory(slicePath, m.memoryPath, m.memoryMaxFile); err != nil {
+	if err := verifyCgroupHasEnoughMemory(sbParent, m.memoryPath, m.memoryMaxFile); err != nil {
 		return "", "", err
 	}
 
