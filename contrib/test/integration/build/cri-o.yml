@@ -26,6 +26,13 @@
     regexp: '^Restart='
     line: 'Restart=no'
 
+- name: Remove prefix of ExecStart for older systemd
+  lineinfile:
+    path: "{{ ansible_env.GOPATH }}/src/github.com/cri-o/cri-o/contrib/systemd/crio.service"
+    regexp: '^ExecStart=+/usr/local/bin/crio'
+    line: 'ExecStart=/usr/local/bin/crio'
+  when: (ansible_distribution == 'RedHat' and ansible_distribution_major_version|int < 8)
+
 - name: install cri-o
   make:
     target: install

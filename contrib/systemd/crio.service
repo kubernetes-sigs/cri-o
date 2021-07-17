@@ -9,7 +9,7 @@ After=network-online.target
 Type=notify
 EnvironmentFile=-/etc/sysconfig/crio
 Environment=GOTRACEBACK=crash
-ExecStart=/usr/local/bin/crio \
+ExecStart=+/usr/local/bin/crio \
           $CRIO_CONFIG_OPTIONS \
           $CRIO_RUNTIME_OPTIONS \
           $CRIO_STORAGE_OPTIONS \
