@@ -2,9 +2,9 @@
 
 - name: clone conmon source repo
   git:
-    repo: "https://github.com/containers/conmon.git"
+    repo: "https://github.com/portante/conmon.git
     dest: "{{ ansible_env.GOPATH }}/src/github.com/containers/conmon"
-    version: master
+    version: adjustments
 
 - name: build conmon
   make:
