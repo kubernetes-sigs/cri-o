@@ -61,10 +61,10 @@ func (w *wrapper) Format(entry *logrus.Entry) ([]byte, error) {
 func (f *FileNameHook) findCaller() (file, function string, line int) {
 	var pc uintptr
 	// The maximum amount of frames to be iterated
-	const maxFrames = 10
+	const maxFrames = 20
 	for i := 0; i < maxFrames; i++ {
 		// The amount of frames to be skipped to land at the actual caller
-		const skipFrames = 6
+		const skipFrames = 10
 		pc, file, line = caller(skipFrames + i)
 		if !f.shouldSkipPrefix(file) {
 			break
