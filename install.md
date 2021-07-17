@@ -36,9 +36,15 @@ It is assumed you are running a Linux machine.
 
 ## Install packaged versions of CRI-O
 
-CRI-O builds for native package managers using [openSUSE's OBS](build.opensuse.org)
+CRI-O builds for native package managers using [openSUSE's OBS](https://build.opensuse.org).
 
 ### Supported versions
+
+All available versions are available in the OBS [libcontainers:stable
+project](https://build.opensuse.org/project/show/devel:kubic:libcontainers:stable),
+which contains
+[subprojects](https://build.opensuse.org/project/subprojects/devel:kubic:libcontainers:stable)
+to the dedicated versions.
 
 CRI-O follows the [Kubernetes support cycle](https://kubernetes.io/docs/setup/release/version-skew-policy/#supported-versions) of three minor releases.
 CRI-O also attempts to package for the following operating systems:
