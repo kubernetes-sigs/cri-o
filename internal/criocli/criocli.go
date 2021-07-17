@@ -797,7 +797,7 @@ func getCrioFlags(defConf *libconfig.Config) []cli.Flag {
 		},
 		&cli.IntFlag{
 			Name:    "grpc-max-send-msg-size",
-			Usage:   "Maximum grpc receive message size",
+			Usage:   "Maximum grpc send message size  in bytes",
 			Value:   defConf.GRPCMaxSendMsgSize,
 			EnvVars: []string{"CONTAINER_GRPC_MAX_SEND_MSG_SIZE"},
 		},
