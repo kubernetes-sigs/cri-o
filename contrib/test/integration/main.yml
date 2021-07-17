@@ -1,6 +1,7 @@
 ---
 - hosts: all
   remote_user: root
+  gather_facts: yes
   vars_files:
     - "{{ playbook_dir }}/vars.yml"
   tags:
@@ -13,6 +14,12 @@
       include: golang.yml
       vars:
         version: "1.16.0"
+
+    # (haircommander) the RHEL 8 image I started with didn't have seccomp properly set up
+    # as the pkg-config didn't work. this caused compilation errors. download manually in the RHEL case
+    - name: download seccomp
+      include: build/seccomp.yml
+      when: ansible_distribution in ['RedHat']
 
     - name: clone build and install bats
       include: "build/bats.yml"

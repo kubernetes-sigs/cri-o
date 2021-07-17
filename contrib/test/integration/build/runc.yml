@@ -8,7 +8,7 @@
 
 - name: build runc
   make:
-    params: BUILDTAGS="seccomp selinux"
+    params: GO111MODULE=on BUILDTAGS="seccomp selinux"
     chdir: "{{ ansible_env.GOPATH }}/src/github.com/opencontainers/runc"
 
 - name: install runc

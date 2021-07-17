@@ -1,0 +1,21 @@
+---
+
+- name: download seccomp
+  unarchive:
+    src: https://github.com/seccomp/libseccomp/releases/download/v2.3.3/libseccomp-2.3.3.tar.gz
+    dest: "{{ ansible_env.HOME }}"
+    remote_src: yes
+
+- name: configure seccomp
+  shell: ./configure
+  args:
+      chdir: "{{ ansible_env.HOME }}/libseccomp"
+
+- name: compile seccomp
+  make:
+    chdir: "{{ ansible_env.HOME }}/libseccomp"
+
+- name: install seccomp
+  make:
+    chdir: "{{ ansible_env.HOME }}/libseccomp"
+    target: install
