@@ -40,20 +40,10 @@
                         --report-dir={{ artifacts }}"
             &> {{ artifacts }}/e2e.log
 
-- block:
+- name: run e2e tests
+  shell: "{{ e2e_shell_cmd | regex_replace('\\s+', ' ') }}"
+  args:
+    chdir: "{{ ansible_env.GOPATH }}/src/k8s.io/kubernetes"
+  async: '{{ 60 * 60 * 4 }}'  # seconds
+  poll: 60
 
-    - name: Disable selinux during e2e tests
-      command: 'setenforce 0'
-      when: not e2e_selinux_enabled
-
-    - name: run e2e tests
-      shell: "{{ e2e_shell_cmd | regex_replace('\\s+', ' ') }}"
-      args:
-        chdir: "{{ ansible_env.GOPATH }}/src/k8s.io/kubernetes"
-      async: '{{ 60 * 60 * 4 }}'  # seconds
-      poll: 60
-
-  always:
-
-    - name: Re-enable SELinux after e2e tests
-      command: 'setenforce 1'
