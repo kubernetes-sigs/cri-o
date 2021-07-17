@@ -225,8 +225,11 @@ bin/crio.cross.%: .gopathok .explicit_phony
 	$(GO_BUILD) $(GO_LDFLAGS) -tags "containers_image_openpgp btrfs_noversion" -o "$@" $(PROJECT)/cmd/crio
 
 nixpkgs:
-	@nix run -f channel:nixos-20.09 nix-prefetch-git -c nix-prefetch-git \
-		--no-deepClone https://github.com/nixos/nixpkgs > nix/nixpkgs.json
+	@nix run \
+		-f channel:nixos-21.05 nix-prefetch-git \
+		-c nix-prefetch-git \
+		--no-deepClone \
+		https://github.com/nixos/nixpkgs refs/heads/nixos-21.05 > nix/nixpkgs.json
 
 
 define go-build
