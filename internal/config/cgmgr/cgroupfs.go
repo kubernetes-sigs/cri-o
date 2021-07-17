@@ -160,3 +160,8 @@ func setWorkloadSettings(cgPath string, resources *rspec.LinuxResources) error {
 func (m *CgroupfsManager) CreateSandboxCgroup(sbParent, containerID string) error {
 	return createSandboxCgroup(sbParent, containerID, m)
 }
+
+// RemoveSandboxCgroup calls the helper function removeSandboxCgroup for this manager.
+func (m *CgroupfsManager) RemoveSandboxCgroup(sbParent, containerID string) error {
+	return removeSandboxCgroup(sbParent, containerID, m)
+}

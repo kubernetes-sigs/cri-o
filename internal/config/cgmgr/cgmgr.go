@@ -66,6 +66,9 @@ type CgroupManager interface {
 	// CreateSandboxCgroup takes the sandbox parent, and sandbox ID.
 	// It creates a new cgroup for that sandbox, which is useful when spoofing an infra container.
 	CreateSandboxCgroup(sbParent, containerID string) error
+	// RemoveSandboxCgroup takes the sandbox parent, and sandbox ID.
+	// It loads a cgroup for that sandbox, and then deletes it.
+	RemoveSandboxCgroup(sbParent, containerID string) error
 }
 
 // New creates a new CgroupManager with defaults
@@ -141,4 +144,18 @@ func createSandboxCgroup(sbParent, containerID string, mgr CgroupManager) error 
 	}
 	_, err = cgroups.New(path, &rspec.LinuxResources{})
 	return err
+}
+
+// removeSandboxCgroup takes the sandbox parent, and sandbox ID.
+// It loads a cgroup for that sandbox, and then deletes it.
+func removeSandboxCgroup(sbParent, containerID string, mgr CgroupManager) error {
+	path, err := mgr.ContainerCgroupAbsolutePath(sbParent, containerID)
+	if err != nil {
+		return err
+	}
+	cg, err := cgroups.Load(path)
+	if err != nil {
+		return err
+	}
+	return cg.Delete()
 }

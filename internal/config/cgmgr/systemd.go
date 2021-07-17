@@ -176,3 +176,8 @@ func convertCgroupFsNameToSystemd(cgroupfsName string) string {
 func (m *SystemdManager) CreateSandboxCgroup(sbParent, containerID string) error {
 	return createSandboxCgroup(sbParent, containerID, m)
 }
+
+// RemoveSandboxCgroup calls the helper function removeSandboxCgroup for this manager.
+func (m *SystemdManager) RemoveSandboxCgroup(sbParent, containerID string) error {
+	return removeSandboxCgroup(sbParent, containerID, m)
+}

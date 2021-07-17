@@ -92,6 +92,12 @@ func (s *Server) stopPodSandbox(ctx context.Context, sb *sandbox.Sandbox) error 
 		return err
 	}
 
+	if podInfraContainer.Spoofed() {
+		if err := s.config.CgroupManager().RemoveSandboxCgroup(sb.CgroupParent(), sb.ID()); err != nil {
+			return err
+		}
+	}
+
 	if err := s.StorageRuntimeServer().StopContainer(sb.ID()); err != nil && !errors.Is(err, storage.ErrContainerUnknown) {
 		log.Warnf(ctx, "Failed to stop sandbox container in pod sandbox %s: %v", sb.ID(), err)
 	}
