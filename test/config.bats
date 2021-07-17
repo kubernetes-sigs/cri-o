@@ -11,6 +11,12 @@ function teardown() {
 	cleanup_test
 }
 
+@test "default config should be empty" {
+	setup_crio
+	output=$("$CRIO_BINARY_PATH" config "|sed 's/#.*//' | tr -d '\n'")
+	[[ "$output" == *"[crio]"* ]]
+}
+
 @test "config dir should succeed" {
 	# given
 	setup_crio

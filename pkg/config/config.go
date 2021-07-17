@@ -56,6 +56,7 @@ const (
 // Config represents the entire set of configuration values that can be set for
 // the server. This is intended to be loaded from a toml-encoded config file.
 type Config struct {
+	Comment          string
 	singleConfigPath string // Path to the single config file
 	dropInConfigDir  string // Path to the drop-in config files
 
@@ -167,7 +168,6 @@ type RuntimeHandler struct {
 	RuntimePath       string `toml:"runtime_path"`
 	RuntimeType       string `toml:"runtime_type"`
 	RuntimeRoot       string `toml:"runtime_root"`
-
 	// PrivilegedWithoutHostDevices can be used to restrict passing host devices
 	// to a container running as privileged.
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices,omitempty"`
@@ -494,6 +494,7 @@ func (t *tomlConfig) SetSystemContext(c *Config) {
 }
 
 func (t *tomlConfig) toConfig(c *Config) {
+	c.Comment = "# "
 	c.RootConfig = t.Crio.RootConfig
 	c.APIConfig = t.Crio.API.APIConfig
 	c.RuntimeConfig = t.Crio.Runtime.RuntimeConfig
