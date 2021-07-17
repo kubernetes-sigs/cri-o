@@ -524,3 +524,57 @@ sudo systemctl start crio
 - Follow this [tutorial](tutorials/crictl.md) to quickly get started running simple pods and containers.
 - To run a full cluster, see [the instructions](tutorials/kubernetes.md).
 - To run with kubeadm, see [kubeadm instructions](tutorials/kubeadm.md).
+
+### Updating CRI-O
+
+#### openSUSE:
+```
+sudo zypper update
+sudo zypper update cri-o
+```
+
+### Fedora 31 or later
+```
+sudo dnf update
+sudo dnf update cri-o
+```
+
+### Other yum based operating systems
+
+```
+sudo yum update
+sudo yum update cri-o
+```
+
+### APT based operating systems
+
+If updating to a patch version (for example, ``VERSION=1.8.3``
+  ), run
+```
+apt update cri-o cri-o-runc
+```
+Otherwise, be sure that the environment variable ```$OS``` is set to your operating system as the appropriate field in the following table
+To install on the following operating systems, set the environment variable $OS as the appropriate field in the following table:
+
+| Operating system | $OS               |
+| ---------------- | ----------------- |
+| Debian Unstable  | `Debian_Unstable` |
+| Debian Testing   | `Debian_Testing`  |
+| Ubuntu 20.04     | `xUbuntu_20.04`   |
+| Ubuntu 19.10     | `xUbuntu_19.10`   |
+| Ubuntu 19.04     | `xUbuntu_19.04`   |
+| Ubuntu 18.04     | `xUbuntu_18.04`   |
+
+To upgrade, choose a supported version for your operating system, and export it as a variable, like so:
+`export VERSION=1.18`, and run the following as root
+```
+rm /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$VERSION.list
+
+echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$VERSION/$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$VERSION.list
+
+curl -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$VERSION/$OS/Release.key | apt-key add -
+
+apt update
+apt install cri-o cri-o-runc
+
+```
