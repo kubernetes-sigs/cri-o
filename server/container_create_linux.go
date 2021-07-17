@@ -143,7 +143,6 @@ func (s *Server) createSandboxContainer(ctx context.Context, ctr ctrIface.Contai
 	// creates a spec Generator with the default spec.
 	specgen := ctr.Spec()
 	specgen.HostSpecific = true
-	specgen.ClearProcessRlimits()
 
 	for _, u := range s.config.Ulimits() {
 		specgen.AddProcessRlimits(u.Name, u.Hard, u.Soft)

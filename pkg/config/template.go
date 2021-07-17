@@ -683,7 +683,7 @@ const templateStringCrioRuntime = `# The crio.runtime table contains settings pe
 const templateStringCrioRuntimeDefaultUlimits = `# A list of ulimits to be set in containers by default, specified as
 # "<ulimit name>=<soft limit>:<hard limit>", for example:
 # "nofile=1024:2048"
-# If nothing is set here, settings will be inherited from the CRI-O daemon
+# If nothing is set here, limits that aren't explicitly set by runtime-tools will be inherited from the process launching the container.
 default_ulimits = [
 {{ range $ulimit := .DefaultUlimits }}{{ printf "\t%q,\n" $ulimit }}{{ end }}]
 

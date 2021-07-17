@@ -103,7 +103,7 @@ The `crio.runtime` table contains settings pertaining to the OCI runtime used an
   The _name_ of the OCI runtime to be used as the default.
 
 **default_ulimits**=[]
-  A list of ulimits to be set in containers by default, specified as "<ulimit name>=<soft limit>:<hard limit>", for example:"nofile=1024:2048". If nothing is set here, settings will be inherited from the CRI-O daemon.
+  A list of ulimits to be set in containers by default, specified as "<ulimit name>=<soft limit>:<hard limit>", for example:"nofile=1024:2048". If nothing is set here, limits that aren't explicitly set by runtime-tools will be inherited from the process launching the container.
 
 **no_pivot**=false
   If true, the runtime will not use `pivot_root`, but instead use `MS_MOVE`.
