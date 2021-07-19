@@ -349,6 +349,11 @@ func (s *Sandbox) createFileInInfraDir(filename string) error {
 		return nil
 	}
 	infra := s.InfraContainer()
+	// If the infra directory has been cleaned up already, we should not fail to
+	// create this file.
+	if _, err := os.Stat(infra.Dir()); os.IsNotExist(err) {
+		return nil
+	}
 	f, err := os.Create(filepath.Join(infra.Dir(), filename))
 	if err == nil {
 		f.Close()

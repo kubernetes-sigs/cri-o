@@ -45,6 +45,7 @@ crio
 [--hooks-dir]=[value]
 [--image-volumes]=[value]
 [--insecure-registry]=[value]
+[--internal-wipe]
 [--listen]=[value]
 [--log-dir]=[value]
 [--log-filter]=[value]
@@ -221,6 +222,8 @@ crio [GLOBAL OPTIONS] command [COMMAND OPTIONS] [ARGUMENTS...]
        their CA to their system's list of trusted CAs instead of using
        '--insecure-registry'. (default: [])
 
+**--internal-wipe**: Whether CRI-O should wipe containers after a reboot and images after an upgrade when the server starts. If set to false, one must run `crio wipe` to wipe the containers and images in these situations.
+
 **--listen**="": Path to the CRI-O socket (default: /var/run/crio/crio.sock)
 
 **--log**="": Set the log file path where internal debug information is written
@@ -267,7 +270,7 @@ crio [GLOBAL OPTIONS] command [COMMAND OPTIONS] [ARGUMENTS...]
 
 **--root, -r**="": The CRI-O root directory (default: /var/lib/containers/storage)
 
-**--runroot**="": The CRI-O state directory (default: /var/run/containers/storage)
+**--runroot**="": The CRI-O state directory (default: /run/containers/storage)
 
 **--runtimes**="": OCI runtimes, format is runtime_name:runtime_path:runtime_root:runtime_type (default: [])
 

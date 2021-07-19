@@ -45,6 +45,7 @@ h
 --hooks-dir
 --image-volumes
 --insecure-registry
+--internal-wipe
 --listen
 --log
 --log-dir

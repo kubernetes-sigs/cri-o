@@ -30,8 +30,7 @@ func (s *Server) StopContainer(ctx context.Context, req *pb.StopContainerRequest
 		}
 	}
 
-	_, err = s.ContainerServer.ContainerStop(ctx, req.ContainerId, req.Timeout)
-	if err != nil {
+	if err := s.ContainerServer.StopContainer(ctx, c, req.Timeout); err != nil {
 		return nil, err
 	}
 

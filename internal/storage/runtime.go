@@ -73,11 +73,6 @@ type RuntimeServer interface {
 	// Pointer arguments can be nil.  Either the image name or ID can be
 	// omitted, but not both.  All other arguments are required.
 	CreatePodSandbox(systemContext *types.SystemContext, podName, podID, imageName, imageAuthFile, imageID, containerName, metadataName, uid, namespace string, attempt uint32, idMappings *idtools.IDMappings, labelOptions []string, privileged bool) (ContainerInfo, error)
-	// RemovePodSandbox deletes a pod sandbox's infrastructure container.
-	// The CRI expects that a sandbox can't be removed unless its only
-	// container is its infrastructure container, but we don't enforce that
-	// here, since we're just keeping track of it for higher level APIs.
-	RemovePodSandbox(idOrName string) error
 
 	// GetContainerMetadata returns the metadata we've stored for a container.
 	GetContainerMetadata(idOrName string) (RuntimeContainerMetadata, error)
@@ -354,27 +349,15 @@ func (r *runtimeService) CreateContainer(systemContext *types.SystemContext, pod
 	return r.createContainerOrPodSandbox(systemContext, podName, podID, imageName, "", imageID, containerName, containerID, metadataName, "", "", attempt, idMappings, labelOptions, false, privileged)
 }
 
-func (r *runtimeService) RemovePodSandbox(idOrName string) error {
-	container, err := r.storageImageServer.GetStore().Container(idOrName)
-	if err != nil {
-		if errors.Is(err, storage.ErrContainerUnknown) {
-			return ErrInvalidSandboxID
-		}
-		return err
-	}
-	err = r.storageImageServer.GetStore().DeleteContainer(container.ID)
-	if err != nil {
-		logrus.Debugf("failed to delete pod sandbox %q: %v", container.ID, err)
-		return err
-	}
-	return nil
-}
-
 func (r *runtimeService) DeleteContainer(idOrName string) error {
 	if idOrName == "" {
 		return ErrInvalidContainerID
 	}
 	container, err := r.storageImageServer.GetStore().Container(idOrName)
+	// Already deleted
+	if errors.Is(err, storage.ErrContainerUnknown) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}

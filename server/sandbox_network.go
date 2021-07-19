@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	cnitypes "github.com/containernetworking/cni/pkg/types"
@@ -11,7 +12,9 @@ import (
 	"github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/log"
 	"github.com/cri-o/cri-o/server/metrics"
+	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	utilnet "k8s.io/utils/net"
 )
@@ -180,4 +183,51 @@ func (s *Server) networkStop(ctx context.Context, sb *sandbox.Sandbox) error {
 	}
 
 	return sb.SetNetworkStopped(true)
+}
+
+func (s *Server) newPodNetwork(sb *sandbox.Sandbox) (ocicni.PodNetwork, error) {
+	var egress, ingress int64 = 0, 0
+
+	if val, ok := sb.Annotations()["kubernetes.io/egress-bandwidth"]; ok {
+		egressQ, err := resource.ParseQuantity(val)
+		if err != nil {
+			return ocicni.PodNetwork{}, fmt.Errorf("failed to parse egress bandwidth: %v", err)
+		} else if iegress, isok := egressQ.AsInt64(); isok {
+			egress = iegress
+		}
+	}
+	if val, ok := sb.Annotations()["kubernetes.io/ingress-bandwidth"]; ok {
+		ingressQ, err := resource.ParseQuantity(val)
+		if err != nil {
+			return ocicni.PodNetwork{}, fmt.Errorf("failed to parse ingress bandwidth: %v", err)
+		} else if iingress, isok := ingressQ.AsInt64(); isok {
+			ingress = iingress
+		}
+	}
+
+	var bwConfig *ocicni.BandwidthConfig
+
+	if ingress > 0 || egress > 0 {
+		bwConfig = &ocicni.BandwidthConfig{}
+		if ingress > 0 {
+			bwConfig.IngressRate = uint64(ingress)
+			bwConfig.IngressBurst = math.MaxUint32 * 8 // 4GB burst limit
+		}
+		if egress > 0 {
+			bwConfig.EgressRate = uint64(egress)
+			bwConfig.EgressBurst = math.MaxUint32 * 8 // 4GB burst limit
+		}
+	}
+
+	network := s.config.CNIPlugin().GetDefaultNetworkName()
+	return ocicni.PodNetwork{
+		Name:      sb.KubeName(),
+		Namespace: sb.Namespace(),
+		Networks:  []ocicni.NetAttachment{},
+		ID:        sb.ID(),
+		NetNS:     sb.NetNsPath(),
+		RuntimeConfig: map[string]ocicni.RuntimeConfig{
+			network: {Bandwidth: bwConfig},
+		},
+	}, nil
 }

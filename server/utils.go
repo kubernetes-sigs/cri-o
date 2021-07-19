@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,15 +14,12 @@ import (
 	encconfig "github.com/containers/ocicrypt/config"
 	cryptUtils "github.com/containers/ocicrypt/utils"
 	"github.com/containers/storage/pkg/mount"
-	"github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/log"
-	"github.com/cri-o/ocicni/pkg/ocicni"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-tools/validate"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/syndtr/gocapability/capability"
-	"k8s.io/apimachinery/pkg/api/resource"
 	pb "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -105,53 +101,6 @@ func parseDNSOptions(servers, searches, options []string, path string) error {
 	}
 
 	return nil
-}
-
-func (s *Server) newPodNetwork(sb *sandbox.Sandbox) (ocicni.PodNetwork, error) {
-	var egress, ingress int64 = 0, 0
-
-	if val, ok := sb.Annotations()["kubernetes.io/egress-bandwidth"]; ok {
-		egressQ, err := resource.ParseQuantity(val)
-		if err != nil {
-			return ocicni.PodNetwork{}, fmt.Errorf("failed to parse egress bandwidth: %v", err)
-		} else if iegress, isok := egressQ.AsInt64(); isok {
-			egress = iegress
-		}
-	}
-	if val, ok := sb.Annotations()["kubernetes.io/ingress-bandwidth"]; ok {
-		ingressQ, err := resource.ParseQuantity(val)
-		if err != nil {
-			return ocicni.PodNetwork{}, fmt.Errorf("failed to parse ingress bandwidth: %v", err)
-		} else if iingress, isok := ingressQ.AsInt64(); isok {
-			ingress = iingress
-		}
-	}
-
-	var bwConfig *ocicni.BandwidthConfig
-
-	if ingress > 0 || egress > 0 {
-		bwConfig = &ocicni.BandwidthConfig{}
-		if ingress > 0 {
-			bwConfig.IngressRate = uint64(ingress)
-			bwConfig.IngressBurst = math.MaxUint32 * 8 // 4GB burst limit
-		}
-		if egress > 0 {
-			bwConfig.EgressRate = uint64(egress)
-			bwConfig.EgressBurst = math.MaxUint32 * 8 // 4GB burst limit
-		}
-	}
-
-	network := s.config.CNIPlugin().GetDefaultNetworkName()
-	return ocicni.PodNetwork{
-		Name:      sb.KubeName(),
-		Namespace: sb.Namespace(),
-		Networks:  []ocicni.NetAttachment{},
-		ID:        sb.ID(),
-		NetNS:     sb.NetNsPath(),
-		RuntimeConfig: map[string]ocicni.RuntimeConfig{
-			network: {Bandwidth: bwConfig},
-		},
-	}, nil
 }
 
 // inStringSlice checks whether a string is inside a string slice.

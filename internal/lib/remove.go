@@ -23,8 +23,7 @@ func (c *ContainerServer) Remove(ctx context.Context, container string, force bo
 		return "", errors.Errorf("cannot remove paused container %s", ctrID)
 	case oci.ContainerStateCreated, oci.ContainerStateRunning:
 		if force {
-			_, err = c.ContainerStop(ctx, container, 10)
-			if err != nil {
+			if err = c.StopContainer(ctx, ctr, 10); err != nil {
 				return "", errors.Wrapf(err, "unable to stop container %s", ctrID)
 			}
 		} else {

@@ -16,7 +16,7 @@ function teardown() {
 	   < "$TESTDATA"/sandbox_config.json > "$TESTDIR"/sandbox_no_infra.json
 	pod_id=$(crictl runp "$TESTDIR"/sandbox_no_infra.json)
 
-	output=$("$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list)
+	output=$(runtime list)
 	[[ ! "$output" = *"$pod_id"* ]]
 }
 
@@ -25,6 +25,6 @@ function teardown() {
 	   < "$TESTDATA"/sandbox_config.json > "$TESTDIR"/sandbox_no_infra.json
 	pod_id=$(crictl runp "$TESTDIR"/sandbox_no_infra.json)
 
-	output=$("$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list)
+	output=$(runtime list)
 	[[ "$output" = *"$pod_id"* ]]
 }

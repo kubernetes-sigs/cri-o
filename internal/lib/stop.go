@@ -9,29 +9,22 @@ import (
 )
 
 // ContainerStop stops a running container with a grace period (i.e., timeout).
-func (c *ContainerServer) ContainerStop(ctx context.Context, container string, timeout int64) (string, error) {
-	ctr, err := c.LookupContainer(container)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to find container %s", container)
-	}
-	ctrID := ctr.ID()
-
-	err = c.runtime.StopContainer(ctx, ctr, timeout)
-	if err != nil {
+func (c *ContainerServer) StopContainer(ctx context.Context, ctr *oci.Container, timeout int64) error {
+	if err := c.runtime.StopContainer(ctx, ctr, timeout); err != nil {
 		// only fatally error if the error is not that the container was already stopped
 		// we still want to write container state to disk if the container has already
 		// been stopped
 		if err != oci.ErrContainerStopped {
-			return "", errors.Wrapf(err, "failed to stop container %s", ctrID)
+			return errors.Wrapf(err, "failed to stop container %s", ctr.ID())
 		}
 	} else {
 		// we only do these operations if StopContainer didn't fail (even if the failure
 		// was the container already being stopped)
 		if err := c.runtime.WaitContainerStateStopped(ctx, ctr); err != nil {
-			return "", errors.Wrapf(err, "failed to get container 'stopped' status %s", ctrID)
+			return errors.Wrapf(err, "failed to get container 'stopped' status %s", ctr.ID())
 		}
-		if err := c.storageRuntimeServer.StopContainer(ctrID); err != nil {
-			return "", errors.Wrapf(err, "failed to unmount container %s", ctrID)
+		if err := c.storageRuntimeServer.StopContainer(ctr.ID()); err != nil {
+			return errors.Wrapf(err, "failed to unmount container %s", ctr.ID())
 		}
 	}
 
@@ -39,5 +32,5 @@ func (c *ContainerServer) ContainerStop(ctx context.Context, container string, t
 		logrus.Warnf("unable to write containers %s state to disk: %v", ctr.ID(), err)
 	}
 
-	return ctrID, nil
+	return nil
 }

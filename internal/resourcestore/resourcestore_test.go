@@ -6,6 +6,7 @@ import (
 	"github.com/cri-o/cri-o/internal/resourcestore"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -30,14 +31,14 @@ func (e *entry) SetCreated() {
 var _ = t.Describe("ResourceStore", func() {
 	// Setup the test
 	var (
-		sut          *resourcestore.ResourceStore
-		cleanupFuncs []func()
-		e            *entry
+		sut     *resourcestore.ResourceStore
+		cleaner *resourcestore.ResourceCleaner
+		e       *entry
 	)
 	Context("no timeout", func() {
 		BeforeEach(func() {
 			sut = resourcestore.New()
-			cleanupFuncs = make([]func(), 0)
+			cleaner = resourcestore.NewResourceCleaner()
 			e = &entry{
 				id: testID,
 			}
@@ -49,7 +50,7 @@ var _ = t.Describe("ResourceStore", func() {
 			// Given
 
 			// When
-			Expect(sut.Put(testName, e, cleanupFuncs)).To(BeNil())
+			Expect(sut.Put(testName, e, cleaner)).To(BeNil())
 
 			// Then
 			id := sut.Get(testName)
@@ -62,14 +63,14 @@ var _ = t.Describe("ResourceStore", func() {
 			// Given
 
 			// When
-			Expect(sut.Put(testName, e, cleanupFuncs)).To(BeNil())
+			Expect(sut.Put(testName, e, cleaner)).To(BeNil())
 
 			// Then
-			Expect(sut.Put(testName, e, cleanupFuncs)).NotTo(BeNil())
+			Expect(sut.Put(testName, e, cleaner)).NotTo(BeNil())
 		})
 		It("Get should call SetCreated", func() {
 			// When
-			Expect(sut.Put(testName, e, cleanupFuncs)).To(BeNil())
+			Expect(sut.Put(testName, e, cleaner)).To(BeNil())
 
 			// Then
 			id := sut.Get(testName)
@@ -95,7 +96,7 @@ var _ = t.Describe("ResourceStore", func() {
 			}
 
 			// When
-			Expect(sut.Put(testName, e, cleanupFuncs)).To(BeNil())
+			Expect(sut.Put(testName, e, cleaner)).To(BeNil())
 			// Then
 			Expect(waitWatcherSet(watcher1)).To(BeTrue())
 			Expect(waitWatcherSet(watcher2)).To(BeTrue())
@@ -103,7 +104,7 @@ var _ = t.Describe("ResourceStore", func() {
 	})
 	Context("with timeout", func() {
 		BeforeEach(func() {
-			cleanupFuncs = make([]func(), 0)
+			cleaner = resourcestore.NewResourceCleaner()
 			e = &entry{
 				id: testID,
 			}
@@ -117,8 +118,9 @@ var _ = t.Describe("ResourceStore", func() {
 			sut = resourcestore.NewWithTimeout(timeout)
 
 			timedOutChan := make(chan bool)
-			cleanupFuncs = append(cleanupFuncs, func() {
+			cleaner.Add(context.Background(), "test", func() error {
 				timedOutChan <- true
+				return nil
 			})
 			go func() {
 				time.Sleep(timeout * 3)
@@ -126,7 +128,7 @@ var _ = t.Describe("ResourceStore", func() {
 			}()
 
 			// When
-			Expect(sut.Put(testName, e, cleanupFuncs)).To(BeNil())
+			Expect(sut.Put(testName, e, cleaner)).To(BeNil())
 
 			// Then
 			didStoreCallTimeoutFunc := <-timedOutChan
@@ -147,7 +149,7 @@ var _ = t.Describe("ResourceStore", func() {
 			// When
 			go func() {
 				time.Sleep(timeout * 6)
-				Expect(sut.Put(testName, e, cleanupFuncs)).To(BeNil())
+				Expect(sut.Put(testName, e, cleaner)).To(BeNil())
 				timedOutChan <- true
 			}()
 

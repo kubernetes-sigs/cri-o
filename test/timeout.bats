@@ -58,7 +58,7 @@ function wait_clean() {
 	pods=$(crictl pods -q)
 	[[ -z "$pods" ]]
 
-	created_ctr_id=$("$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q)
+	created_ctr_id=$(runtime list -q)
 	[ -n "$created_ctr_id" ]
 
 	output=$(crictl runp "$TESTDATA"/sandbox_config.json)
@@ -81,7 +81,7 @@ function wait_clean() {
 	[[ -z "$ctrs" ]]
 
 	# cri-o should have created a container
-	created_ctr_id=$("$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q | grep -v "$pod_id")
+	created_ctr_id=$(runtime list -q | grep -v "$pod_id")
 	[ -n "$created_ctr_id" ]
 
 	output=$(crictl create "$pod_id" "$TESTDATA"/container_config.json "$TESTDATA"/sandbox_config.json)
@@ -98,7 +98,7 @@ function wait_clean() {
 
 	wait_create
 
-	created_ctr_id=$("$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q)
+	created_ctr_id=$(runtime list -q)
 	[ -n "$created_ctr_id" ]
 
 	# we should create a new pod and not reuse the old one
@@ -108,7 +108,7 @@ function wait_clean() {
 	wait_clean
 
 	# the old, timed out container should have been removed
-	! "$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q | grep "$created_ctr_id"
+	! runtime list -q | grep "$created_ctr_id"
 }
 
 @test "should clean up container after timeout if request changes" {
@@ -123,7 +123,7 @@ function wait_clean() {
 	wait_create
 
 	# cri-o should have created a container
-	created_ctr_id=$("$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q | grep -v "$pod_id")
+	created_ctr_id=$(runtime list -q | grep -v "$pod_id")
 	[ -n "$created_ctr_id" ]
 
 	# should create a new container and not reuse the old one
@@ -133,7 +133,7 @@ function wait_clean() {
 	wait_clean
 
 	# the old, timed out container should have been removed
-	! "$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q | grep "$created_ctr_id"
+	! runtime list -q | grep "$created_ctr_id"
 }
 
 @test "should clean up pod after timeout if not re-requested" {
@@ -151,7 +151,7 @@ function wait_clean() {
 	[[ -z "$pods" ]]
 
 	# pod should have been cleaned up
-	[[ -z $("$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q) ]]
+	[[ -z $(runtime list -q) ]]
 
 	# we should recreate the pod and not reuse the old one
 	crictl runp "$TESTDATA"/sandbox_config.json
@@ -173,7 +173,7 @@ function wait_clean() {
 	[[ -z "$ctrs" ]]
 
 	# container should have been cleaned up
-	! "$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q | grep -v "$pod_id"
+	! runtime list -q | grep -v "$pod_id"
 
 	# we should recreate the container and not reuse the old one
 	crictl create "$pod_id" "$TESTDATA"/container_config.json "$TESTDATA"/sandbox_config.json
@@ -193,7 +193,7 @@ function wait_clean() {
 	wait_create
 
 	# container should not have been cleaned up
-	created_ctr_id=$("$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q)
+	created_ctr_id=$(runtime list -q)
 	[ -n "$created_ctr_id" ]
 
 	! crictl create "$created_ctr_id" "$TESTDATA"/container_config.json "$TESTDATA"/sandbox_config.json
@@ -213,7 +213,7 @@ function wait_clean() {
 	wait_create
 
 	# cri-o should have created a container
-	created_ctr_id=$("$CONTAINER_RUNTIME" --root "$RUNTIME_ROOT" list -q | grep -v "$pod_id")
+	created_ctr_id=$(runtime list -q | grep -v "$pod_id")
 	[ -n "$created_ctr_id" ]
 
 	! crictl start "$created_ctr_id"

@@ -11,21 +11,28 @@ import (
 
 // RemoveImage removes the image.
 func (s *Server) RemoveImage(ctx context.Context, req *pb.RemoveImageRequest) (*pb.RemoveImageResponse, error) {
-	image := ""
-	img := req.GetImage()
+	imageRef := ""
+	img := req.Image
 	if img != nil {
-		image = img.Image
+		imageRef = img.Image
 	}
-	if image == "" {
+	if imageRef == "" {
 		return nil, fmt.Errorf("no image specified")
 	}
+	if err := s.removeImage(ctx, imageRef); err != nil {
+		return nil, err
+	}
+	return &pb.RemoveImageResponse{}, nil
+}
+
+func (s *Server) removeImage(ctx context.Context, imageRef string) error {
 	var deleted bool
-	images, err := s.StorageImageServer().ResolveNames(s.config.SystemContext, image)
+	images, err := s.StorageImageServer().ResolveNames(s.config.SystemContext, imageRef)
 	if err != nil {
 		if err == storage.ErrCannotParseImageID {
-			images = append(images, image)
+			images = append(images, imageRef)
 		} else {
-			return nil, err
+			return err
 		}
 	}
 	for _, img := range images {
@@ -38,7 +45,7 @@ func (s *Server) RemoveImage(ctx context.Context, req *pb.RemoveImageRequest) (*
 		break
 	}
 	if !deleted && err != nil {
-		return nil, err
+		return err
 	}
-	return &pb.RemoveImageResponse{}, nil
+	return nil
 }
