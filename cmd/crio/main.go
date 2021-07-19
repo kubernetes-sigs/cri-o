@@ -17,6 +17,7 @@ import (
 	"github.com/containers/storage/pkg/reexec"
 	"github.com/cri-o/cri-o/internal/criocli"
 	"github.com/cri-o/cri-o/internal/log"
+	"github.com/cri-o/cri-o/internal/otel"
 	"github.com/cri-o/cri-o/internal/signals"
 	"github.com/cri-o/cri-o/internal/version"
 	libconfig "github.com/cri-o/cri-o/pkg/config"
@@ -29,6 +30,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/soheilhy/cmux"
 	"github.com/urfave/cli/v2"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 )
@@ -43,7 +45,7 @@ func writeCrioGoroutineStacks() {
 	}
 }
 
-func catchShutdown(ctx context.Context, cancel context.CancelFunc, gserver *grpc.Server, sserver *server.Server, hserver *http.Server, signalled *bool) {
+func catchShutdown(ctx context.Context, cancel context.CancelFunc, gserver *grpc.Server, tp *sdktrace.TracerProvider, sserver *server.Server, hserver *http.Server, signalled *bool) {
 	sig := make(chan os.Signal, 2048)
 	signal.Notify(sig, signals.Interrupt, signals.Term, unix.SIGUSR1, unix.SIGUSR2, unix.SIGPIPE, signals.Hup)
 	go func() {
@@ -70,6 +72,11 @@ func catchShutdown(ctx context.Context, cancel context.CancelFunc, gserver *grpc
 			*signalled = true
 			gserver.GracefulStop()
 			hserver.Shutdown(ctx) // nolint: errcheck
+			if tp != nil {
+				if err := tp.Shutdown(ctx); err != nil {
+					logrus.Warnf("Error shutting down opentelemetry tracer provider: %v", err)
+				}
+			}
 			if err := sserver.StopStreamServer(); err != nil {
 				logrus.Warnf("Error shutting down streaming server: %v", err)
 			}
@@ -214,12 +221,24 @@ func main() {
 			logrus.Fatalf("Failed to chmod listen socket %s: %v", config.Listen, err)
 		}
 
+		enableOtel := config.EnableMetrics && config.EnableTracing
+		tracerProvider, otelUnaryInterceptor, otelStreamInterceptor, err := otel.InitOtelTracing(
+			ctx,
+			enableOtel,
+			config.CollectorGRPCPort,
+			config.OtelServiceName,
+			config.TracingExporter,
+		)
 		grpcServer := grpc.NewServer(
 			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 				metrics.UnaryInterceptor(),
 				log.UnaryInterceptor(),
+				otelUnaryInterceptor,
 			)),
-			grpc.StreamInterceptor(log.StreamInterceptor()),
+			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
+				log.StreamInterceptor(),
+				otelStreamInterceptor,
+			)),
 			grpc.MaxSendMsgSize(config.GRPCMaxSendMsgSize),
 			grpc.MaxRecvMsgSize(config.GRPCMaxRecvMsgSize),
 		)
@@ -296,7 +315,7 @@ func main() {
 		}
 
 		graceful := false
-		catchShutdown(ctx, cancel, grpcServer, crioServer, httpServer, &graceful)
+		catchShutdown(ctx, cancel, grpcServer, tracerProvider, crioServer, httpServer, &graceful)
 
 		go func() {
 			if err := grpcServer.Serve(grpcL); err != nil {

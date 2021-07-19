@@ -41,6 +41,9 @@ func assembleTemplateString(displayAllConfig bool, c *Config) string {
 	// [crio.metrics] configuration
 	templateString += crioTemplateString(crioMetricsConfig, templateStringCrioMetrics, displayAllConfig, crioTemplateConfig)
 
+	// [crio.otel] configuration
+	templateString += crioTemplateString(crioOtelConfig, templateStringCrioOtel, displayAllConfig, crioTemplateConfig)
+
 	if templateString != "" {
 		templateString = templateStringPrefix + templateStringCrio + templateString
 	}
@@ -75,6 +78,7 @@ const (
 	crioImageConfig   templateGroup = 4
 	crioNetworkConfig templateGroup = 5
 	crioMetricsConfig templateGroup = 6
+	crioOtelConfig    templateGroup = 7
 )
 
 type templateConfigValue struct {
@@ -469,6 +473,26 @@ func initCrioTemplateConfig(c *Config) ([]*templateConfigValue, error) {
 			templateString: templateStringCrioMetricsMetricsKey,
 			group:          crioMetricsConfig,
 			isDefaultValue: simpleEqual(dc.MetricsKey, c.MetricsKey),
+		},
+		{
+			templateString: templateStringCrioOtelEnableTracing,
+			group:          crioOtelConfig,
+			isDefaultValue: simpleEqual(dc.EnableTracing, c.EnableTracing),
+		},
+		{
+			templateString: templateStringCrioOtelCollectorGRPCPort,
+			group:          crioOtelConfig,
+			isDefaultValue: simpleEqual(dc.CollectorGRPCPort, c.CollectorGRPCPort),
+		},
+		//{
+		//	templateString: templateStringCrioOtelSamplingRatePerMillion,
+		//	group:          crioOtelConfig,
+		//	isDefaultValue: simpleEqual(dc.SamplingRatePerMillion, c.SamplingRatePerMillion),
+		//},
+		{
+			templateString: templateStringCrioOtelTracingExporter,
+			group:          crioOtelConfig,
+			isDefaultValue: simpleEqual(dc.TracingExporter, c.TracingExporter),
 		},
 	}
 
@@ -1152,7 +1176,7 @@ metrics_collectors = [
 
 `
 
-const templateStringCrioMetricsMetricsPort = `# The port on which the metrics server will listen.
+const templateStringCrioMetricsMetricsPort = `# The port on which the metrics and opentelemetry servers will listen.
 metrics_port = {{ .MetricsPort }}
 
 `
@@ -1173,5 +1197,25 @@ metrics_cert = "{{ .MetricsCert }}"
 const templateStringCrioMetricsMetricsKey = `# The certificate key for the secure metrics server.
 # Behaves in the same way as the metrics_cert.
 metrics_key = "{{ .MetricsKey }}"
+
+`
+const templateStringCrioOtel = `# A necessary configuration for opentelemetry trace retrieval
+[crio.otel]
+
+`
+const templateStringCrioOtelEnableTracing = `# Globally enable or disable exporting opentelemetry traces.
+enable_tracing = {{ .EnableTracing }}
+
+`
+const templateStringCrioOtelCollectorGRPCPort = `# Port that the collector gRPC server listens on.
+collector_grpc_port = {{ .CollectorGRPCPort }}
+
+`
+const templateStringCrioOtelSamplingRatePerMillion = `# Number of samples to collect per million spans.
+sampling_rate_per_million = {{ .SamplingRatePerMillion }}
+
+`
+const templateStringCrioOtelTracingExporter = `# Opentelemetry trace exporter to configure.
+tracing_backend = {{ .TracingExporter }}
 
 `

@@ -9,6 +9,8 @@ import (
 	oci "github.com/cri-o/cri-o/internal/oci"
 	"github.com/cri-o/cri-o/server/cri/types"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/context"
 )
 
@@ -16,6 +18,10 @@ import (
 // sandbox, they should be force deleted.
 func (s *Server) RemovePodSandbox(ctx context.Context, req *types.RemovePodSandboxRequest) error {
 	log.Infof(ctx, "Removing pod sandbox: %s", req.PodSandboxID)
+	tracer := otel.GetTracerProvider().Tracer(s.tracerName)
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "remove-pod-sandbox")
+	defer span.End()
 	sb, err := s.getPodSandboxFromRequest(req.PodSandboxID)
 	if err != nil {
 		if err == sandbox.ErrIDEmpty {

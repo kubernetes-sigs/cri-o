@@ -6,6 +6,8 @@ import (
 	"github.com/cri-o/cri-o/internal/lib/sandbox"
 	"github.com/cri-o/cri-o/internal/log"
 	"github.com/cri-o/cri-o/server/cri/types"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/context"
 )
 
@@ -14,6 +16,10 @@ import (
 func (s *Server) StopPodSandbox(ctx context.Context, req *types.StopPodSandboxRequest) error {
 	// platform dependent call
 	log.Infof(ctx, "Stopping pod sandbox: %s", req.PodSandboxID)
+	tracer := otel.GetTracerProvider().Tracer(s.tracerName)
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "stop-pod-sandbox")
+	defer span.End()
 	sb, err := s.getPodSandboxFromRequest(req.PodSandboxID)
 	if err != nil {
 		if err == sandbox.ErrIDEmpty {
