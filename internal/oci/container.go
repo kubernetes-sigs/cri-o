@@ -72,6 +72,10 @@ type Container struct {
 	stdinOnce          bool
 	created            bool
 	spoofed            bool
+	stopping           bool
+	stopTimeoutChan    chan time.Duration
+	stoppedChan        chan struct{}
+	stopLock           sync.Mutex
 }
 
 // Metadata holds all necessary information for building the container name.
@@ -132,6 +136,8 @@ func NewContainer(id, name, bundlePath, logPath string, labels, crioAnnotations,
 		dir:             dir,
 		state:           state,
 		stopSignal:      stopSignal,
+		stopTimeoutChan: make(chan time.Duration, 1),
+		stoppedChan:     make(chan struct{}, 1),
 	}
 	return c, nil
 }
