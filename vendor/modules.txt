@@ -182,7 +182,7 @@ github.com/containers/buildah/pkg/overlay
 github.com/containers/buildah/pkg/parse
 github.com/containers/buildah/pkg/rusage
 github.com/containers/buildah/util
-# github.com/containers/common v0.38.12
+# github.com/containers/common v0.38.16
 ## explicit
 github.com/containers/common/libimage
 github.com/containers/common/libimage/manifests
@@ -274,7 +274,7 @@ github.com/containers/ocicrypt/keywrap/pkcs7
 github.com/containers/ocicrypt/spec
 github.com/containers/ocicrypt/utils
 github.com/containers/ocicrypt/utils/keyprovider
-# github.com/containers/podman/v3 v3.2.2
+# github.com/containers/podman/v3 v3.2.3
 ## explicit
 github.com/containers/podman/v3/libpod
 github.com/containers/podman/v3/libpod/define
