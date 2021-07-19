@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 
-	"k8s.io/klog/v2"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
@@ -23,13 +23,13 @@ func NewMetaHostportManager() HostPortManager {
 	// Create IPv4 handler
 	iptInterface := utiliptables.New(exec, utiliptables.ProtocolIPv4)
 	if _, err := iptInterface.EnsureChain(utiliptables.TableNAT, iptablesproxy.KubeMarkMasqChain); err != nil {
-		klog.Warningf("unable to ensure iptables chain: %v", err)
+		logrus.Warnf("Unable to ensure iptables chain: %v", err)
 	}
 	hostportManagerv4 := NewHostportManager(iptInterface)
 	// Create IPv6 handler
 	ip6tInterface := utiliptables.New(exec, utiliptables.ProtocolIPv6)
 	if _, err := ip6tInterface.EnsureChain(utiliptables.TableNAT, iptablesproxy.KubeMarkMasqChain); err != nil {
-		klog.Warningf("unable to ensure ip6tables chain: %v", err)
+		logrus.Warnf("Unable to ensure ip6tables chain: %v", err)
 	}
 	hostportManagerv6 := NewHostportManager(ip6tInterface)
 
