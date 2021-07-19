@@ -314,7 +314,8 @@ mockgen: \
 	mock-lib-config \
 	mock-oci \
 	mock-image-types \
-	mock-ocicni-types
+	mock-ocicni-types \
+	mock-metrics
 
 mock-containerstorage: ${MOCKGEN}
 	${MOCKGEN} \
@@ -357,6 +358,12 @@ mock-ocicni-types: ${MOCKGEN}
 		-package ocicnitypesmock \
 		-destination ${MOCK_PATH}/ocicni/types.go \
 		github.com/cri-o/ocicni/pkg/ocicni CNIPlugin
+
+mock-metrics: ${MOCKGEN}
+	${MOCKGEN} \
+		-package metricsmock \
+		-destination ${MOCK_PATH}/metrics/metrics.go \
+		github.com/cri-o/cri-o/server/metrics Impl
 
 codecov: SHELL := $(shell which bash)
 codecov:

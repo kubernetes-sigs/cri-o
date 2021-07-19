@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,7 +13,6 @@ import (
 
 	libconfig "github.com/cri-o/cri-o/pkg/config"
 	"github.com/cri-o/cri-o/server/metrics/collectors"
-	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -29,6 +27,8 @@ func SinceInMicroseconds(start time.Time) float64 {
 
 // Metrics is the main structure for starting the metrics endpoints.
 type Metrics struct {
+	impl                          Impl
+	finished                      chan bool
 	config                        *libconfig.MetricsConfig
 	metricOperations              *prometheus.CounterVec
 	metricOperationsLatency       *prometheus.GaugeVec
@@ -50,7 +50,9 @@ var instance *Metrics
 // New creates a new metrics instance.
 func New(config *libconfig.MetricsConfig) *Metrics {
 	instance = &Metrics{
-		config: config,
+		impl:     &defaultImpl{},
+		finished: make(chan bool),
+		config:   config,
 		metricOperations: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Subsystem: collectors.Subsystem,
@@ -199,7 +201,7 @@ func (m *Metrics) Start(stop chan struct{}) error {
 
 	metricsSocket := m.config.MetricsSocket
 	if metricsSocket != "" {
-		if err := libconfig.RemoveUnusedSocket(metricsSocket); err != nil {
+		if err := m.impl.RemoveUnusedSocket(metricsSocket); err != nil {
 			return errors.Wrapf(err, "removing unused socket %s", metricsSocket)
 		}
 
@@ -338,7 +340,7 @@ func (m *Metrics) createEndpoint() (*http.ServeMux, error) {
 	} {
 		if m.config.MetricsCollectors.Contains(collector) {
 			logrus.Debugf("Enabling metric: %s", collector.Stripped())
-			if err := prometheus.Register(metric); err != nil {
+			if err := m.impl.Register(metric); err != nil {
 				return nil, errors.Wrap(err, "register metric")
 			}
 		} else {
@@ -354,7 +356,7 @@ func (m *Metrics) createEndpoint() (*http.ServeMux, error) {
 func (m *Metrics) startEndpoint(
 	stop chan struct{}, network, address string, me http.Handler,
 ) error {
-	l, err := net.Listen(network, address)
+	l, err := m.impl.Listen(network, address)
 	if err != nil {
 		return errors.Wrap(err, "creating listener")
 	}
@@ -365,42 +367,47 @@ func (m *Metrics) startEndpoint(
 			logrus.Infof("Serving metrics on %s via HTTPs", address)
 
 			kpr, reloadErr := newCertReloader(
-				stop, m.config.MetricsCert, m.config.MetricsKey,
+				m.impl, stop, m.config.MetricsCert, m.config.MetricsKey,
 			)
 			if reloadErr != nil {
 				logrus.Fatalf("Creating key pair reloader: %v", reloadErr)
 			}
 
-			srv := http.Server{
+			srv := &http.Server{
 				Handler: me,
 				TLSConfig: &tls.Config{
 					GetCertificate: kpr.getCertificate,
 					MinVersion:     tls.VersionTLS12,
 				},
 			}
-			err = srv.ServeTLS(l, m.config.MetricsCert, m.config.MetricsKey)
+			err = m.impl.ServeTLS(srv, l, m.config.MetricsCert, m.config.MetricsKey)
 		} else {
 			logrus.Infof("Serving metrics on %s via HTTP", address)
-			err = http.Serve(l, me)
+			err = m.impl.Serve(l, me)
 		}
 
 		if err != nil {
 			logrus.Fatalf("Failed to serve metrics endpoint %v: %v", l, err)
 		}
+		m.finished <- true
 	}()
 
 	return nil
 }
 
 type certReloader struct {
+	impl        Impl
 	certLock    sync.RWMutex
 	certificate *tls.Certificate
 	certPath    string
 	keyPath     string
 }
 
-func newCertReloader(doneChan chan struct{}, certPath, keyPath string) (*certReloader, error) {
+func newCertReloader(
+	impl Impl, doneChan chan struct{}, certPath, keyPath string,
+) (*certReloader, error) {
 	reloader := &certReloader{
+		impl:     impl,
 		certPath: certPath,
 		keyPath:  keyPath,
 	}
@@ -440,7 +447,7 @@ func newCertReloader(doneChan chan struct{}, certPath, keyPath string) (*certRel
 		return nil, errors.Wrap(err, "load certificate")
 	}
 
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := reloader.impl.NewWatcher()
 	if err != nil {
 		return nil, errors.Wrap(err, "create new watcher")
 	}
@@ -471,7 +478,7 @@ func newCertReloader(doneChan chan struct{}, certPath, keyPath string) (*certRel
 		}()
 		for _, f := range []string{certPath, keyPath} {
 			logrus.Debugf("Watching file %s for changes", f)
-			if err := watcher.Add(f); err != nil {
+			if err := reloader.impl.Add(watcher, f); err != nil {
 				logrus.Fatalf("Unable to watch %s: %v", f, err)
 			}
 		}
@@ -482,7 +489,7 @@ func newCertReloader(doneChan chan struct{}, certPath, keyPath string) (*certRel
 }
 
 func (c *certReloader) reload() error {
-	certificate, err := tls.LoadX509KeyPair(c.certPath, c.keyPath)
+	certificate, err := c.impl.LoadX509KeyPair(c.certPath, c.keyPath)
 	if err != nil {
 		return errors.Wrap(err, "load x509 key pair")
 	}
