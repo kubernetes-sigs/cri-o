@@ -19,7 +19,7 @@
       when: not integration_selinux_enabled
 
     - name: run integration tests
-      shell: "make localintegration >& {{ crio_integration_filepath }}"
+      shell: "make localintegration 2>&1 | tee {{ crio_integration_filepath }}"
       args:
         chdir: "{{ ansible_env.GOPATH }}/src/github.com/cri-o/cri-o"
       environment: '{{ int_test_env }}'  # from vars.yml and main.yml
